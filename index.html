@@ -199,18 +199,30 @@ hr{border:none;border-top:1px solid var(--bd);margin:20px 0}
         <div class="month-nav">
           <button class="mnbtn" onclick="changeMonth(-1)">‹</button>
           <div class="month-display" id="monthDisplay"></div>
-          <button class="mnbtn" onclick="changeMonth(1)">›</button>
+          <button class="mnbtn mnav-fwd" onclick="changeMonth(1)">›</button>
         </div>
       </div>
 
-      <!-- Step 2: Person -->
+      <!-- Step 2: Fixed categories above person selection -->
+      <div id="fixedFieldsArea" style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:14px 16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="stitle" style="margin-bottom:0">Fixed Monthly Expenses</div>
+          <button class="btn btn-sm" onclick="saveFixedSection()">Save</button>
+        </div>
+        <div id="fixedFieldsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px"></div>
+      </div>
+
+      <!-- Step 3: Person -->
       <div class="selector-row" id="personRow">
         <span class="sel-label">Who are you?</span>
         <div class="pill-group" id="personPills"></div>
       </div>
 
-      <!-- Step 3: Entry area (shown after person selected) -->
+      <!-- Step 4: Entry area (shown after person selected) -->
       <div id="entryArea" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+          <button class="btn btn-sm" onclick="saveTableSection()">Save Table</button>
+        </div>
 
         <!-- Toolbar: smart input + camera + voice -->
         <div class="input-toolbar">
@@ -247,6 +259,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:20px 0}
         <div class="save-bar">
           <span id="saveSummary"></span>
           <span id="syncStatus" style="font-size:11px;color:var(--g);opacity:0;transition:opacity .4s;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:1px"></span>
+          <button class="btn btn-sm" onclick="saveTableSection()">Save Table</button>
           <button class="btn btn-ghost btn-sm" onclick="clearEntry()">Clear</button>
           <button class="btn btn-ghost btn-sm" id="sheetsBtn" onclick="showSheetsSetup()" title="Connect Google Sheets">🔗 Google Sheets</button>
         </div>
@@ -351,7 +364,29 @@ const earners=ms=>ms.filter(m=>m.role==='earner');
 // ═══════════════════════════════════════════
 // CATEGORIES
 // ═══════════════════════════════════════════
-const CATS=['Rent','Electricity','Kirana','Bhaji/Milk/Bread','Medicine','Canteen','RCM','Maid','Scooty','Miscellaneous','Other'];
+// Fixed categories (top fields, one value per month per person)
+const FIXED_CATS=['Rent','Electricity','Maid','Scooty cleaning'];
+const FIXED_DEFAULT_PAID_BY={
+  'Rent':'Mukul',
+  'Electricity':'Mukul',
+  'Maid':'Sanjay',
+  'Scooty cleaning':'Sanjay'
+};
+// Table categories (row-by-row entries)
+const CATS=['Kirana','Bhaji/Milk/Bread','Medicine','Canteen','RCM','Miscellaneous','Other'];
+
+// Sheet column mapping for table categories (Paid By col, Amount col)
+const CAT_COL_MAP={
+  'Kirana':         {paidBy:'H', amount:'I'},
+  'Bhaji/Milk/Bread':{paidBy:'J', amount:'K'},
+  'Medicine':       {paidBy:'L', amount:'M'},
+  'Canteen':        {paidBy:'N', amount:'O'},
+  'RCM':            {paidBy:'P', amount:'Q'},
+  'Miscellaneous':  {paidBy:'R', amount:'T'},
+  'Other':          {paidBy:'U', amount:'W', note:'V'},
+};
+// Fixed category sheet rows (row index in sheet, col B = paid by, col C = amount)
+const FIXED_CAT_ROW={'Rent':2,'Electricity':3,'Maid':10,'Scooty cleaning':11};
 
 // ═══════════════════════════════════════════
 // STATE
@@ -361,10 +396,22 @@ let curY=new Date().getFullYear(),curM=new Date().getMonth();
 let dashY=curY,dashM=curM;
 let settleY=curY,settleM=curM;
 let selectedMemberId=null;
+let fixedFields={}; // {Rent:{amount:28000,paidBy:'Mukul'}, Electricity:{...}, ...}
 let activeTab='entry';
 const todayISO=()=>new Date().toISOString().split('T')[0];
 const fmt=n=>'₹'+Math.round(n).toLocaleString('en-IN');
 const monthStr=(y,m)=>`${MONTHS[m]} ${y}`;
+const canUseOther=()=>OTHER_SPLIT_IDS.includes(selectedMemberId);
+const visibleCats=()=>canUseOther()?CATS:CATS.filter(c=>c!=='Other');
+const blankFixedFor=cat=>({amount:'',paidBy:FIXED_DEFAULT_PAID_BY[cat]||''});
+function fixedMonthKey(y=curY,m=curM){return `ghk3_fixed_${y}_${String(m).padStart(2,'0')}`;}
+function normalizeFixed(saved={}){
+  const src={...saved};
+  if(src.Scooty && !src['Scooty cleaning']) src['Scooty cleaning']=src.Scooty;
+  const out={};
+  FIXED_CATS.forEach(cat=>out[cat]=src[cat]||blankFixedFor(cat));
+  return out;
+}
 
 // ═══════════════════════════════════════════
 // TABS
@@ -384,16 +431,27 @@ function showTab(tab,btn){
 // MONTH NAVIGATION
 // ═══════════════════════════════════════════
 function changeMonth(d){
+  const now=new Date();
+  const maxY=now.getFullYear(), maxM=now.getMonth();
   curM+=d; if(curM>11){curM=0;curY++;} if(curM<0){curM=11;curY--;}
+  // Block future months
+  if(curY>maxY||(curY===maxY&&curM>maxM)){curM=maxM;curY=maxY;}
   renderEntryHeader();
+  renderFixedFields();
   if(selectedMemberId) buildTable();
 }
 function changeDashMonth(d){
+  const now=new Date();
+  const maxY=now.getFullYear(), maxM=now.getMonth();
   dashM+=d; if(dashM>11){dashM=0;dashY++;} if(dashM<0){dashM=11;dashY--;}
+  if(dashY>maxY||(dashY===maxY&&dashM>maxM)){dashM=maxM;dashY=maxY;}
   renderDashboard();
 }
 function changeSettleMonth(d){
+  const now=new Date();
+  const maxY=now.getFullYear(), maxM=now.getMonth();
   settleM+=d; if(settleM>11){settleM=0;settleY++;} if(settleM<0){settleM=11;settleY--;}
+  if(settleY>maxY||(settleY===maxY&&settleM>maxM)){settleM=maxM;settleY=maxY;}
   renderSettle();
 }
 
@@ -401,7 +459,16 @@ function changeSettleMonth(d){
 // ENTRY HEADER (month + person pills)
 // ═══════════════════════════════════════════
 function renderEntryHeader(){
+  const now=new Date();
+  const isCurrentMonth=(curY===now.getFullYear()&&curM===now.getMonth());
   document.getElementById('monthDisplay').textContent=monthStr(curY,curM);
+  // Disable forward arrow if on current month
+  const fwdBtns=document.querySelectorAll('.mnav-fwd');
+  fwdBtns.forEach(b=>{
+    b.disabled=isCurrentMonth;
+    b.style.opacity=isCurrentMonth?'0.3':'1';
+    b.style.cursor=isCurrentMonth?'not-allowed':'pointer';
+  });
   const ms=getMembers();
   document.getElementById('personPills').innerHTML=ms.map(m=>
     `<button class="pill${m.id===selectedMemberId?' on':''}" onclick="selectPerson('${m.id}')">${m.name}</button>`
@@ -424,81 +491,122 @@ let tableRows=[]; // [{date, note, amounts:{cat:val}}]
 function buildTable(){
   const saved=loadPersonExp(curY,curM,selectedMemberId);
   tableRows=saved.length>0 ? saved : emptyRows(25);
+  renderFixedFields();
   renderTable();
   renderMobileRows();
   updateSaveSummary();
 }
 
 function emptyRows(n){
-  return Array.from({length:n},(_,i)=>({date:todayISO(),note:'',amounts:{}}));
+  return Array.from({length:n},(_,i)=>({date:todayISO(),miscNote:'',note:'',amounts:{}}));
 }
 
 function addRows(n){
-  for(let i=0;i<n;i++) tableRows.push({date:todayISO(),note:'',amounts:{}});
+  for(let i=0;i<n;i++) tableRows.push({date:todayISO(),miscNote:'',note:'',amounts:{}});
   renderTable();
   renderMobileRows();
+}
+
+function renderFixedFields(){
+  const ms=getMembers();
+  fixedFields=normalizeFixed(LS.get(fixedMonthKey())||fixedFields||{});
+  document.getElementById('fixedFieldsGrid').innerHTML=FIXED_CATS.map(cat=>{
+    const val=fixedFields[cat]||blankFixedFor(cat);
+    return `<div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:10px 12px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--y);margin-bottom:8px;font-family:'Syne',sans-serif;font-weight:700">${cat}</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="number" min="0" placeholder="Amount ₹" value="${val.amount||''}"
+          style="flex:1;background:var(--s1);border:1px solid var(--bd);color:var(--t);border-radius:var(--rb);padding:7px 8px;font-family:'DM Mono';font-size:13px;outline:none;min-width:0"
+          oninput="setFixedField('${cat}','amount',this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()">
+        <select style="flex:1;background:var(--s1);border:1px solid var(--bd);color:var(--t);border-radius:var(--rb);padding:7px 8px;font-size:12px;outline:none;min-width:0"
+          onchange="setFixedField('${cat}','paidBy',this.value)">
+          <option value="">Paid by...</option>
+          ${ms.map(m=>`<option value="${m.name}" ${val.paidBy===m.name?'selected':''}>${m.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setFixedField(cat, field, value){
+  if(!fixedFields[cat]) fixedFields[cat]=blankFixedFor(cat);
+  fixedFields[cat][field]=field==='amount'?(parseFloat(value)||''):value;
+  updateSaveSummary();
+}
+
+async function saveFixedSection(){
+  fixedFields=normalizeFixed(fixedFields);
+  if(!LS.get(snapKey(curY,curM))) LS.set(snapKey(curY,curM),getMembers());
+  LS.set(fixedMonthKey(), fixedFields);
+  updateSaveSummary();
+  toast('Fixed expenses saved','ok');
+  showSyncStatus('Saved fixed locally ✓');
+  await syncToSheets({includeFixed:true, includeTable:false});
 }
 
 // ── Desktop table ──
 function renderTable(){
   const head=document.getElementById('tblHead');
+  const cats=visibleCats();
   // Use colgroup to control widths — # and Del fixed, Note medium, categories share remaining
   const colgroup=document.getElementById('tblColgroup')||document.createElement('colgroup');
   colgroup.id='tblColgroup';
   colgroup.innerHTML=
     `<col style="width:32px">`+ // #
-    CATS.map(c=>c==='Other'?`<col style="width:7%">`:`<col style="width:7%">`).join('')+
-    `<col style="width:9%">`+ // Note
+    cats.map(c=>`<col style="width:7%">`).join('')+
+    `<col style="width:9%">`+ // Misc note
+    (canUseOther()?`<col style="width:9%">`:``)+ // Other note
     `<col style="width:36px">`; // Del
   const tbl=document.getElementById('mainTable');
   if(!document.getElementById('tblColgroup')) tbl.prepend(colgroup);
 
   head.innerHTML=`<th>#</th>`+
-    CATS.map(c=>{
-      const sub=c==='Other'?`<div style="font-size:8px;color:#f5a62366;margin-top:1px">⚙️ split</div>`:'';
+    cats.map(c=>{
+      const sub=c==='Other'?`<div style="font-size:8px;color:#888;margin-top:1px">÷3</div>`:'';
       return `<th>${c}${sub}</th>`;
     }).join('')+
-    `<th>Note</th><th style="color:var(--r)">Del</th>`;
+    `<th>Misc Note</th>${canUseOther()?`<th>Other Note</th>`:``}<th style="color:var(--r)">Del</th>`;
 
   const body=document.getElementById('tblBody');
   body.innerHTML='';
   tableRows.forEach((row,ri)=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="rnum">${ri+1}</td>`+
-      CATS.map(cat=>{
+      cats.map(cat=>{
         if(cat==='Other'){
-          const splitNames=row.otherSplitNames?row.otherSplitNames.join(', '):'';
-          return `<td style="position:relative;padding:3px 4px">
+          return `<td style="padding:3px 4px">
             <input class="cell-inp" type="number" min="0" step="1" placeholder="" value="${row.amounts[cat]||''}"
               onblur="setAmtOther(${ri},this.value)"
               oninput="liveTotal()"
               onkeydown="handleCellKey(event,this)">
-            <button onclick="showOtherSplitPopup(${ri},this)" title="Set who splits this" style="position:absolute;top:50%;right:4px;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:12px;color:#888;padding:2px;line-height:1">⚙️</button>
-            ${splitNames?`<div style="font-size:9px;color:var(--g);text-align:center;padding:1px 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${splitNames}</div>`:''}
+            <div style="font-size:8px;color:#666;text-align:center;padding:1px 0;white-space:nowrap">M·S·L</div>
           </td>`;
         }
         return `<td><input class="cell-inp" type="number" min="0" step="1" placeholder="" value="${row.amounts[cat]||''}"
-          onblur="setAmt(${ri},'${cat}',this.value);autoSave()"
+          onblur="setAmt(${ri},'${cat}',this.value)"
           oninput="liveTotal()"
           onkeydown="handleCellKey(event,this)"></td>`;
       }).join('')+
-      `<td><input class="row-note" placeholder="note..." value="${row.note||''}" onblur="setNote(${ri},this.value);autoSave()" onkeydown="handleCellKey(event,this)"></td>
+      `<td><input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onblur="setMiscNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>
+      ${canUseOther()?`<td><input class="row-note" placeholder="other note..." value="${row.note||''}" onblur="setNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>`:``}
       <td><button class="row-del" onclick="delRow(${ri})">✕</button></td>`;
     body.appendChild(tr);
   });
 
   const foot=document.getElementById('tblFoot');
   foot.innerHTML=`<td>Total</td>`+
-    CATS.map(cat=>{
+    cats.map(cat=>{
       const t=tableRows.reduce((s,r)=>s+(parseFloat(r.amounts[cat])||0),0);
       return `<td data-fcat="${cat}" style="text-align:right">${t>0?fmt(t):''}</td>`;
     }).join('')+
-    `<td></td><td></td>`;
+    `<td></td>${canUseOther()?`<td></td>`:``}<td></td>`;
 }
 
 // ── Mobile rows ──
 function renderMobileRows(){
   const wrap=document.getElementById('mobileRows');
+  const cats=visibleCats();
   wrap.innerHTML='';
   tableRows.forEach((row,ri)=>{
     const div=document.createElement('div');
@@ -507,9 +615,10 @@ function renderMobileRows(){
       `<button class="mrow-del" onclick="delRow(${ri})">✕</button>
       <div style="grid-column:1/-1;display:flex;gap:6px;align-items:center">
         <span style="font-family:'DM Mono';font-size:11px;color:#666;width:22px">${ri+1}</span>
-        <input class="row-note" placeholder="note..." value="${row.note||''}" onchange="setNote(${ri},this.value)" style="flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px">
+        <input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onchange="setMiscNote(${ri},this.value)" style="flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px">
+        ${canUseOther()?`<input class="row-note" placeholder="other note..." value="${row.note||''}" onchange="setNote(${ri},this.value)" style="flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px">`:``}
       </div>`+
-      CATS.filter(cat=>row.amounts[cat]>0 || true).slice(0,6).map(cat=>
+      cats.filter(cat=>row.amounts[cat]>0 || true).slice(0,6).map(cat=>
         `<div>
           <label class="fl">${cat}</label>
           <input type="number" min="0" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px;width:100%;font-family:'DM Mono';font-size:13px;color:var(--t);outline:none" 
@@ -520,7 +629,7 @@ function renderMobileRows(){
         <label class="fl">More Categories</label>
         <select onchange="openCatOnMobile(${ri},this.value)">
           <option value="">+ Add category...</option>
-          ${CATS.slice(6).map(c=>`<option value="${c}">${c}</option>`).join('')}
+          ${cats.slice(6).map(c=>`<option value="${c}">${c}</option>`).join('')}
         </select>
       </div>`;
     wrap.appendChild(div);
@@ -535,6 +644,7 @@ function openCatOnMobile(ri, cat){
 }
 
 function setDate(ri,v){tableRows[ri].date=v;}
+function setMiscNote(ri,v){tableRows[ri].miscNote=v;}
 function setNote(ri,v){tableRows[ri].note=v;}
 
 // Enter key → move to next input and save current cell
@@ -561,7 +671,7 @@ function setAmt(ri,cat,v){
 function liveTotal(){ updateSaveSummary(); updateFootTotals(); }
 
 function updateFootTotals(){
-  CATS.forEach(cat=>{
+  visibleCats().forEach(cat=>{
     const cell=document.querySelector(`#tblFoot [data-fcat="${cat}"]`);
     if(!cell) return;
     const t=tableRows.reduce((s,r)=>s+(parseFloat(r.amounts[cat])||0),0);
@@ -570,10 +680,12 @@ function updateFootTotals(){
 }
 
 function updateSaveSummary(){
-  const total=tableRows.reduce((s,r)=>s+Object.values(r.amounts).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
+  const tableTotal=tableRows.reduce((s,r)=>s+Object.values(r.amounts).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
+  const fixedTotal=Object.values(fixedFields).reduce((s,f)=>s+(parseFloat(f.amount)||0),0);
+  const total=tableTotal+fixedTotal;
   const filled=tableRows.filter(r=>Object.values(r.amounts).some(v=>parseFloat(v)>0)).length;
   document.getElementById('saveSummary').textContent=
-    total>0?`${filled} row${filled!==1?'s':''} filled · Total: ${fmt(total)}`:'No amounts entered yet';
+    total>0?`${filled} row${filled!==1?'s':''} · Total: ${fmt(total)}`:'No amounts entered yet';
 }
 
 function delRow(ri){
@@ -585,27 +697,32 @@ function delRow(ri){
 
 function clearEntry(){
   tableRows=emptyRows(25);
+  fixedFields={};
+  FIXED_CATS.forEach(cat=>{fixedFields[cat]=blankFixedFor(cat);});
+  renderFixedFields();
   renderTable();
   renderMobileRows();
   updateSaveSummary();
 }
 
 function saveEntry(){
+  return saveTableSection();
+}
+
+async function saveTableSection(){
+  if(!selectedMemberId){toast('Select your name first','err');return;}
   // Allow saving even with no amounts — always snapshot members
   if(!LS.get(snapKey(curY,curM))) LS.set(snapKey(curY,curM),getMembers());
   savePersonExp(curY,curM,selectedMemberId,tableRows);
   const total=tableRows.reduce((s,r)=>s+Object.values(r.amounts).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
-  toast(`Saved! ${fmt(total)} by ${getMembers().find(m=>m.id===selectedMemberId)?.name}`,'ok');
-  showSyncStatus('Saved locally ✓');
+  toast(`Table saved! ${fmt(total)} by ${getMembers().find(m=>m.id===selectedMemberId)?.name}`,'ok');
+  showSyncStatus('Saved table locally ✓');
+  await syncToSheets({includeFixed:false, includeTable:true});
 }
 
-// Auto-save on cell blur
+// Save buttons commit to Google Sheets; editing only updates the on-screen draft.
 function autoSave(){
-  if(!selectedMemberId) return;
-  if(!LS.get(snapKey(curY,curM))) LS.set(snapKey(curY,curM),getMembers());
-  savePersonExp(curY,curM,selectedMemberId,tableRows);
-  showSyncStatus('Saved');
-  syncToSheets();
+  updateSaveSummary();
 }
 
 function showSyncStatus(msg){
@@ -633,56 +750,23 @@ function showSyncStatus(msg){
   }
 }
 
-// ── Other column: popup to pick who splits ──
-function maybeShowOtherPopup(ri, inp){
-  // Only show popup if no split set yet
-  if(tableRows[ri].otherSplit) return;
-  showOtherSplitPopup(ri, inp);
-}
-
-function showOtherSplitPopup(ri, inp){
-  const ms=getMembers().filter(m=>m.role==='earner');
-  // Remove existing popup if any
-  document.querySelectorAll('.other-popup').forEach(el=>el.remove());
-  const pop=document.createElement('div');
-  pop.className='other-popup';
-  pop.style.cssText='position:fixed;z-index:150;background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:16px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.5)';
-  pop.innerHTML=`<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:10px;color:var(--y)">Who splits this "Other" expense?</div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-      ${ms.map(m=>`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-        <input type="checkbox" value="${m.id}" data-name="${m.name}" ${(tableRows[ri].otherSplit||ms.map(x=>x.id)).includes(m.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--y)">
-        ${m.name}
-      </label>`).join('')}
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-y btn-sm" onclick="confirmOtherSplit(${ri},this)">Confirm</button>
-      <button class="btn btn-ghost btn-sm" onclick="this.closest('.other-popup').remove()">Cancel</button>
-    </div>`;
-  // Position near the input
-  const rect=inp?inp.getBoundingClientRect():{top:200,left:400};
-  pop.style.top=(rect.bottom+6)+'px';
-  pop.style.left=Math.min(rect.left, window.innerWidth-240)+'px';
-  document.body.appendChild(pop);
-}
-
-function confirmOtherSplit(ri, btn){
-  const pop=btn.closest('.other-popup');
-  const checked=[...pop.querySelectorAll('input[type=checkbox]:checked')];
-  if(!checked.length){toast('Pick at least one person','err');return;}
-  tableRows[ri].otherSplit=checked.map(c=>c.value);
-  tableRows[ri].otherSplitNames=checked.map(c=>c.dataset.name);
-  pop.remove();
-  renderTable();
-  autoSave();
-}
+// ── Other column: always split between Mukul, Sanjay, Leena ──
+const OTHER_SPLIT_IDS=['mukul','sanjay','leena'];
+const OTHER_SPLIT_NAMES=['Mukul','Sanjay','Leena'];
 
 function setAmtOther(ri, v){
   const n=parseFloat(v)||0;
-  if(n>0) tableRows[ri].amounts['Other']=n;
-  else delete tableRows[ri].amounts['Other'];
+  if(n>0){
+    tableRows[ri].amounts['Other']=n;
+    tableRows[ri].otherSplit=OTHER_SPLIT_IDS;
+    tableRows[ri].otherSplitNames=OTHER_SPLIT_NAMES;
+  } else {
+    delete tableRows[ri].amounts['Other'];
+    delete tableRows[ri].otherSplit;
+    delete tableRows[ri].otherSplitNames;
+  }
   liveTotal();
   updateFootTotals();
-  autoSave();
 }
 
 // ═══════════════════════════════════════════
@@ -696,7 +780,7 @@ const CAT_MAP={
   canteen:'Canteen',
   rcm:'RCM',
   maid:'Maid',bai:'Maid',
-  scooty:'Scooty',cleaning:'Scooty',petrol:'Scooty',
+  scooty:'Scooty cleaning',cleaning:'Scooty cleaning',petrol:'Scooty cleaning',
   misc:'Miscellaneous',other:'Other',
 };
 
@@ -885,6 +969,14 @@ function getAllExpenses(y,m){
   const members=getMembersForMonth(y,m);
   const earn=earners(members);
   const allRows=[];
+  const fixed=normalizeFixed(LS.get(fixedMonthKey(y,m))||{});
+  FIXED_CATS.forEach(cat=>{
+    const val=fixed[cat]||{};
+    const amt=parseFloat(val.amount)||0;
+    const paidBy=(val.paidBy||FIXED_DEFAULT_PAID_BY[cat]||'').trim();
+    const mem=members.find(m=>m.name===paidBy);
+    if(amt>0 && mem) allRows.push({memberId:mem.id,memberName:mem.name,category:cat,amount:amt,date:`${y}-${String(m+1).padStart(2,'0')}-01`,note:'Fixed monthly expense'});
+  });
   members.forEach(mem=>{
     const rows=loadPersonExp(y,m,mem.id);
     rows.forEach(row=>{
@@ -904,12 +996,9 @@ function calcBalances(y,m){
 
   allRows.forEach(r=>{paid[r.memberId]=(paid[r.memberId]||0)+r.amount;});
 
-  // Each expense row by a person is split equally among all earners
-  members.forEach(mem=>{
-    const rows=loadPersonExp(y,m,mem.id);
-    const total=rows.reduce((s,r)=>s+Object.values(r.amounts||{}).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
-    earn.forEach(e=>{share[e.id]=(share[e.id]||0)+total/earn.length;});
-  });
+  // Each expense is split equally among all earners
+  const total=allRows.reduce((s,r)=>s+r.amount,0);
+  earn.forEach(e=>{share[e.id]=(share[e.id]||0)+(earn.length?total/earn.length:0);});
 
   // Homemakers: shift share to coverer
   members.filter(m=>m.role==='homemaker').forEach(m=>{
@@ -1130,7 +1219,7 @@ function showSheetsSetup(){
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
       <div>
         <label class="fl">Google OAuth Client ID</label>
-        <input type="text" id="gClientId" placeholder="xxxx.apps.googleusercontent.com" value="${cfg?.clientId||''}" style="font-size:12px">
+        <input type="text" id="gClientId" placeholder="xxxx.apps.googleusercontent.com" value="${cfg?.clientId||'1024373187213-o6u1n63kppit0ldvlgv3eq7uqch7hqih.apps.googleusercontent.com'}" style="font-size:12px">
       </div>
       <div>
         <label class="fl">Google Sheet ID <span style="color:#888">(from your sheet URL)</span></label>
@@ -1182,7 +1271,6 @@ function signInWithGoogle(clientId, spreadsheetId, overlay){
       overlay?.remove();
       toast('✅ Connected to Google Sheets!','ok');
       updateSheetsBtnLabel();
-      syncToSheets();
     }
   });
   client.requestAccessToken();
@@ -1204,59 +1292,161 @@ function updateSheetsBtnLabel(){
   btn.style.color=cfg?.accessToken?'var(--g)':'#888';
 }
 
-async function syncToSheets(){
+async function syncToSheets(opts={}){
+  const {includeFixed=true, includeTable=true}=opts;
   const cfg=getSheetsConfig();
-  if(!cfg?.accessToken||!cfg?.spreadsheetId||!selectedMemberId) return;
-  if(Date.now()>cfg.tokenExpiry-60000){
-    // Token expired — silently skip, user needs to re-auth
-    showSyncStatus('⚠️ Sheets token expired — reconnect');
-    return;
-  }
+  if(!cfg?.accessToken||!cfg?.spreadsheetId) return;
+  if(includeTable && !selectedMemberId) return;
+  if(Date.now()>cfg.tokenExpiry-60000){showSyncStatus('⚠️ Token expired — reconnect');return;}
+
+  const memberName=getMembers().find(m=>m.id===selectedMemberId)?.name||selectedMemberId;
+  const sheetName=`${MONTHS[curM]} ${curY}`;
+
   try{
-    showSyncStatus('Syncing to Sheets...');
-    const memberName=getMembers().find(m=>m.id===selectedMemberId)?.name||selectedMemberId;
-    const sheetName=`${MONTHS[curM]} ${curY} - ${memberName}`;
-    // Build rows: header + data
-    const header=[['#',...CATS,'Note','Other Split']];
-    const rows=tableRows.map((row,i)=>[
-      i+1,
-      ...CATS.map(cat=>row.amounts[cat]||''),
-      row.note||'',
-      row.otherSplitNames?row.otherSplitNames.join(', '):'',
-    ]);
-    const values=[...header,...rows];
-    // Write to sheet (create range in the named sheet)
-    const range=encodeURIComponent(`${sheetName}!A1`);
-    const url=`https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`;
-    const res=await fetch(url,{
-      method:'PUT',
-      headers:{'Authorization':`Bearer ${cfg.accessToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({values})
-    });
-    if(res.ok){
-      showSyncStatus('Synced to Google Sheets ✓');
-    } else {
-      const err=await res.json();
-      // If sheet tab doesn't exist, create it first then retry
-      if(err.error?.code===400){
-        await createSheetTab(cfg, sheetName);
-        await syncToSheets();
-      } else {
-        showSyncStatus('Sheets error: '+err.error?.message);
-      }
+    showSyncStatus('Syncing...');
+
+    // Step 1: Ensure month tab exists (copy from TEMPLATE if not)
+    await ensureMonthSheet(cfg, sheetName);
+
+    // Step 2: Build batch update data
+    const updates=[];
+    const enc=s=>encodeURIComponent(s);
+
+    if(includeFixed){
+      fixedFields=normalizeFixed(fixedFields);
+      // ── Fixed categories → col B (paidBy) + col C (amount) at fixed rows ──
+      FIXED_CATS.forEach(cat=>{
+        const row=FIXED_CAT_ROW[cat];
+        const val=fixedFields[cat]||blankFixedFor(cat);
+        updates.push({range:`${sheetName}!B${row}`,values:[[val.paidBy||'']]});
+        updates.push({range:`${sheetName}!C${row}`,values:[[val.amount?parseFloat(val.amount)||0:'']]});
+      });
     }
+
+    if(includeTable){
+
+    // ── Table rows: clear person's previous entries first, then rewrite ──
+    // We track which sheet rows belong to this person using a marker column (col X = person name)
+    // First: read existing data to find which rows are this person's
+    const readRange=enc(`${sheetName}!H2:X100`);
+    const readRes=await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${readRange}`,
+      {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
+    );
+    const readData=await readRes.json();
+    const existingRows=readData.values||[];
+
+    // Col X (index 16 in H:X range) = person marker
+    // Clear all rows that belong to this person
+    const clearVals=[];
+    existingRows.forEach((row,i)=>{
+      if(row[16]===memberName){
+        // Clear H through X for this row (17 cols)
+        clearVals.push({range:`${sheetName}!H${i+2}:X${i+2}`,values:[Array(17).fill('')]});
+      }
+    });
+    if(clearVals.length>0){
+      await sheetsRequest(cfg,'POST',`${cfg.spreadsheetId}/values:batchClear`,
+        {ranges:clearVals.map(c=>c.range)});
+    }
+
+    // Find next available rows (rows where H is empty)
+    const reReadRes=await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${readRange}`,
+      {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
+    );
+    const reReadData=await reReadRes.json();
+    const freshRows=reReadData.values||[];
+
+    // Write this person's table rows
+    let sheetRowIdx=0; // index into freshRows
+    const filledAppRows=tableRows.filter(r=>Object.values(r.amounts).some(v=>parseFloat(v)>0));
+
+    for(const appRow of filledAppRows){
+      // Find next empty sheet row
+      while(sheetRowIdx<freshRows.length && freshRows[sheetRowIdx]&&freshRows[sheetRowIdx][0]){
+        sheetRowIdx++;
+      }
+      const sheetRow=sheetRowIdx+2; // +2 because data starts at row 2
+
+      // Write each category amount and paid by
+      visibleCats().filter(c=>c!=='Other').forEach(cat=>{
+        const cols=CAT_COL_MAP[cat];
+        if(!cols) return;
+        const amt=parseFloat(appRow.amounts[cat])||0;
+        if(amt>0){
+          updates.push({range:`${sheetName}!${cols.paidBy}${sheetRow}`,values:[[memberName]]});
+          updates.push({range:`${sheetName}!${cols.amount}${sheetRow}`,values:[[amt]]});
+        }
+      });
+      // Other expense
+      if(canUseOther() && appRow.amounts['Other']>0){
+        const cols=CAT_COL_MAP['Other'];
+        updates.push({range:`${sheetName}!${cols.paidBy}${sheetRow}`,values:[[memberName]]});
+        updates.push({range:`${sheetName}!${cols.amount}${sheetRow}`,values:[[parseFloat(appRow.amounts['Other'])]]});
+      }
+      // Miscellaneous remark in S; Other remark in V.
+      if(appRow.miscNote){
+        updates.push({range:`${sheetName}!S${sheetRow}`,values:[[appRow.miscNote]]});
+      }
+      if(canUseOther() && appRow.note){
+        updates.push({range:`${sheetName}!V${sheetRow}`,values:[[appRow.note]]});
+      }
+      // Person marker in col X
+      updates.push({range:`${sheetName}!X${sheetRow}`,values:[[memberName]]});
+
+      sheetRowIdx++;
+    }
+    }
+
+    // Step 3: Batch write all updates
+    if(updates.length>0){
+      await sheetsRequest(cfg,'POST',`${cfg.spreadsheetId}/values:batchUpdate`,{
+        valueInputOption:'USER_ENTERED',
+        data:updates
+      });
+    }
+
+    showSyncStatus('Synced ✓');
   }catch(e){
-    showSyncStatus('Sheets sync failed');
+    console.error(e);
+    showSyncStatus('Sync failed');
   }
 }
 
-async function createSheetTab(cfg, sheetName){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}:batchUpdate`;
-  await fetch(url,{
-    method:'POST',
-    headers:{'Authorization':`Bearer ${cfg.accessToken}`,'Content-Type':'application/json'},
-    body:JSON.stringify({requests:[{addSheet:{properties:{title:sheetName}}}]})
+async function ensureMonthSheet(cfg, sheetName){
+  // Check if sheet tab exists
+  const metaRes=await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}?fields=sheets.properties.title`,
+    {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
+  );
+  const meta=await metaRes.json();
+  const exists=meta.sheets?.some(s=>s.properties.title===sheetName);
+  if(exists) return;
+
+  // Get TEMPLATE sheet ID
+  const templateSheet=meta.sheets?.find(s=>s.properties.title==='TEMPLATE');
+  if(!templateSheet){toast('TEMPLATE sheet not found in Google Sheets','err');return;}
+
+  // Duplicate TEMPLATE → new tab named sheetName
+  await sheetsRequest(cfg,'POST',`${cfg.spreadsheetId}:batchUpdate`,{
+    requests:[{
+      duplicateSheet:{
+        sourceSheetId:templateSheet.properties.sheetId,
+        insertSheetIndex:meta.sheets.length,
+        newSheetName:sheetName
+      }
+    }]
   });
+}
+
+async function sheetsRequest(cfg, method, path, body){
+  const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${path}`,{
+    method,
+    headers:{'Authorization':`Bearer ${cfg.accessToken}`,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  return res.json();
 }
 
 // ═══════════════════════════════════════════
@@ -1264,6 +1454,7 @@ async function createSheetTab(cfg, sheetName){
 // ═══════════════════════════════════════════
 renderEntryHeader();
 updateSheetsBtnLabel();
+renderFixedFields();
 </script>
 </body>
 </html>

@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Expense</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0f;--s1:#13131b;--s2:#1a1a24;--s3:#21212e;
+  --bd:#2c2c3e;--bd2:#383850;
+  --y:#f5a623;--yd:rgba(245,166,35,.13);
+  --g:#3ecf8e;--gd:rgba(62,207,142,.12);
+  --r:#e55;--rd:rgba(238,85,85,.12);
+  --b:#6c8fff;--bd-blue:rgba(108,143,255,.12);
+  --t:#eeeef8;--m:#6868888;--m2:#444458;
+  --ra:12px;--rb:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--t);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;overflow-x:hidden}
+
+/* ─ layout ─ */
+.app{display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:var(--s1);border-bottom:1px solid var(--bd);padding:0 24px;display:flex;align-items:center;gap:16px;height:72px;position:sticky;top:0;z-index:80;flex-wrap:wrap}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;letter-spacing:2px;white-space:nowrap;margin-right:8px;line-height:1;text-transform:uppercase;transform:scaleY(1.9);transform-origin:left center;display:inline-block}
+.logo em{color:var(--y);font-style:normal;display:block;font-size:9px;letter-spacing:4px;font-weight:700;text-transform:uppercase;margin-top:2px}
+.main{flex:1;max-width:1100px;width:100%;margin:0 auto;padding:24px 16px 80px}
+
+/* ─ nav tabs ─ */
+.navtabs{display:flex;gap:4px;margin-bottom:24px}
+.nt{padding:7px 18px;border-radius:40px;border:1px solid var(--bd);background:transparent;color:#888;font-family:'DM Sans';font-size:13px;cursor:pointer;transition:.15s;white-space:nowrap}
+.nt:hover:not(.on){color:var(--t);border-color:var(--bd2)}
+.nt.on{background:var(--y);border-color:var(--y);color:#000;font-weight:600}
+
+/* ─ month + person selectors ─ */
+.selector-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.sel-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;white-space:nowrap}
+.pill-group{display:flex;gap:6px;flex-wrap:wrap}
+.pill{padding:6px 16px;border-radius:40px;border:1px solid var(--bd);background:transparent;color:#888;font-family:'DM Sans';font-size:13px;cursor:pointer;transition:.15s;white-space:nowrap}
+.pill:hover:not(.on){color:var(--t);border-color:var(--bd2)}
+.pill.on{background:var(--y);border-color:var(--y);color:#000;font-weight:600}
+.month-nav{display:flex;align-items:center;gap:6px}
+.mnbtn{background:var(--s2);border:1px solid var(--bd);color:var(--t);width:28px;height:28px;border-radius:var(--rb);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:.15s}
+.mnbtn:hover{background:var(--bd)}
+.month-display{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;min-width:120px;text-align:center;background:var(--s2);border:1px solid var(--bd);padding:5px 12px;border-radius:40px}
+
+/* ─ input toolbar ─ */
+.input-toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.ib{padding:7px 14px;border-radius:var(--rb);border:1px solid var(--bd);background:var(--s2);color:var(--t);font-family:'DM Sans';font-size:12px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.ib:hover{border-color:var(--y);color:var(--y)}
+.ib.voice-on{background:var(--rd);border-color:var(--r);color:var(--r);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.smart-wrap{flex:1;min-width:220px;display:flex;gap:6px}
+.smart-inp{flex:1;background:var(--s2);border:1px solid var(--bd);color:var(--t);border-radius:var(--rb);padding:7px 12px;font-family:'DM Mono';font-size:12px;outline:none;transition:.15s}
+.smart-inp:focus{border-color:var(--y)}
+.smart-inp::placeholder{color:#555}
+
+/* ─ table (desktop) ─ */
+.tbl-wrap{overflow-x:auto;border-radius:var(--ra);border:1px solid var(--bd);background:var(--s1);margin-bottom:12px}
+.tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.tbl th{background:var(--s2);font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#888;padding:8px 4px;text-align:center;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);white-space:normal;word-break:break-word;line-height:1.3;vertical-align:bottom}
+.tbl th:first-child{text-align:center;width:32px;position:sticky;left:0;background:var(--s2);z-index:2}
+.tbl th:last-child{border-right:none;width:36px}
+.tbl td{padding:2px 3px;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);vertical-align:middle}
+.tbl td:first-child{background:var(--s1);position:sticky;left:0;z-index:1;padding:2px 4px;font-family:'DM Mono';font-size:11px;color:#666;text-align:center;width:32px}
+.tbl td:last-child{border-right:none;background:var(--s1);width:36px}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--s2)}
+.tbl tr:hover td:first-child,.tbl tr:hover td:last-child{background:var(--s2)}
+.cell-inp{width:100%;background:transparent;border:none;color:var(--t);font-family:'DM Mono';font-size:12px;padding:4px 2px;outline:none;text-align:right;border-radius:4px;transition:.15s;min-width:0}
+.cell-inp:focus{background:var(--bd-blue);color:#fff}
+.cell-inp::placeholder{color:#333}
+.row-note{width:100%;background:transparent;border:none;color:#888;font-family:'DM Sans';font-size:12px;padding:4px 4px;outline:none}
+.row-note:focus{background:var(--s3);border-radius:4px}
+.row-del{background:none;border:none;color:#444;cursor:pointer;padding:3px 6px;border-radius:4px;font-size:13px;transition:.15s}
+.row-del:hover{color:var(--r);background:var(--rd)}
+.tbl-foot{background:var(--s2);font-family:'Syne',sans-serif;font-weight:700;font-size:11px}
+.tbl-foot td{padding:6px 4px;border-top:2px solid var(--bd);color:var(--y);text-align:right;border-right:1px solid var(--bd)}
+.tbl-foot td:first-child{color:#888;text-align:center;font-family:'DM Sans';font-size:10px}
+.tbl-foot td:last-child{border-right:none}
+@media(max-width:700px){.tbl-wrap{display:none}}
+
+/* ─ mobile row ─ */
+.mobile-entries{display:none}
+@media(max-width:700px){.mobile-entries{display:block}}
+.mrow{background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:10px 12px;margin-bottom:6px;display:grid;grid-template-columns:1fr 1fr;gap:6px;position:relative}
+.mrow-del{position:absolute;top:8px;right:8px;background:none;border:none;color:#444;cursor:pointer;font-size:13px;transition:.15s}
+.mrow-del:hover{color:var(--r)}
+
+/* ─ form elements ─ */
+select,input[type=date]{background:var(--s2);border:1px solid var(--bd);color:var(--t);border-radius:var(--rb);padding:7px 10px;font-family:'DM Sans';font-size:13px;outline:none;width:100%;transition:.15s}
+select:focus,input[type=date]:focus{border-color:var(--y)}
+select option{background:var(--s2)}
+label.fl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888;display:block;margin-bottom:4px}
+
+/* ─ buttons ─ */
+.btn{padding:9px 20px;border-radius:var(--rb);border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-y{background:var(--y);color:#000}.btn-y:hover{background:#ffc040}
+.btn-g{background:var(--g);color:#000}.btn-g:hover{background:#5af0a8}
+.btn-ghost{background:transparent;border:1px solid var(--bd);color:#888}.btn-ghost:hover{border-color:var(--bd2);color:var(--t)}
+.btn-sm{padding:6px 14px;font-size:12px}
+.add-rows-btn{width:100%;padding:8px;background:transparent;border:1px dashed var(--bd);color:#555;border-radius:var(--rb);cursor:pointer;font-size:13px;transition:.15s;margin-bottom:12px}
+.add-rows-btn:hover{border-color:var(--y);color:var(--y)}
+.save-bar{display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:12px 0;border-top:1px solid var(--bd);margin-top:4px;flex-wrap:wrap}
+.save-bar span{font-size:12px;color:#666;flex:1}
+
+/* ─ dashboard ─ */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px}
+.dcard{background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:16px;position:relative;overflow:hidden}
+.dcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.dcard.get::before{background:var(--g)}.dcard.owe::before{background:var(--r)}.dcard.even::before{background:var(--m2)}
+.dc-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:2px}
+.dc-paid{font-size:11px;color:#888;margin-bottom:8px}
+.dc-amt{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;display:inline-block;transform:scaleY(1.8);transform-origin:left center;line-height:1}
+.dc-amt.pos{color:var(--g)}.dc-amt.neg{color:var(--r)}.dc-amt.zer{color:#666}
+.dc-status{font-size:10px;color:#888;margin-top:3px}
+.stitle{font-family:'Syne',sans-serif;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#888;margin-bottom:12px}
+.cat-bars{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+.cat-row{display:flex;align-items:center;gap:10px}
+.cat-row-name{font-size:12px;color:#aaa;min-width:130px}
+.cat-bar-bg{flex:1;height:6px;background:var(--bd);border-radius:3px;overflow:hidden}
+.cat-bar-fill{height:100%;background:var(--y);border-radius:3px;transition:width .5s ease}
+.cat-row-amt{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;min-width:70px;text-align:right}
+.summary-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:520px){.summary-cards{grid-template-columns:1fr 1fr}}
+.sc{background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:14px}
+.sc-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:5px}
+.sc-val{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;display:inline-block;transform:scaleY(1.8);transform-origin:left center;line-height:1}
+.sc-val.y{color:var(--y)}.sc-val.g{color:var(--g)}
+.sc-sub{font-size:11px;color:#888;margin-top:3px}
+
+/* ─ settle ─ */
+.settle-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.settle-item{background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:14px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sf{font-family:'Syne',sans-serif;font-weight:700;color:var(--r)}
+.sa{color:#666;font-size:15px}
+.st{font-family:'Syne',sans-serif;font-weight:700;color:var(--g)}
+.sam{margin-left:auto;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--y)}
+.all-good{text-align:center;padding:40px;color:#666}
+.all-good .big{font-size:36px;margin-bottom:8px}
+
+/* ─ members tab ─ */
+.mem-row{background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.mem-av{width:34px;height:34px;border-radius:50%;background:var(--s2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:12px;color:var(--y);flex-shrink:0}
+.mem-info{flex:1;min-width:100px}
+.mem-name{font-weight:600;font-size:14px}
+.mem-role-txt{font-size:11px;color:#888}
+.tag{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-left:5px}
+.te{background:var(--gd);color:var(--g)}.th{background:var(--yd);color:var(--y)}.tc{background:var(--s3);color:#888}
+.mem-acts{display:flex;gap:6px;flex-wrap:wrap}
+.add-mem-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.add-mem-form input,.add-mem-form select{flex:1;min-width:120px}
+.info-box{background:var(--s2);border:1px solid var(--bd);border-radius:var(--ra);padding:12px 16px;font-size:12px;color:#888;margin-bottom:16px;line-height:1.7}
+.info-box strong{color:var(--y)}
+
+/* ─ modal ─ */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:24px;max-width:420px;width:100%;animation:up .2s ease}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.modal h3{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:10px}
+.modal p{color:#888;font-size:13px;margin-bottom:16px;line-height:1.6}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.mbtn{padding:8px 18px;border-radius:var(--rb);border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:13px}
+
+/* ─ scan result preview ─ */
+.scan-preview{background:var(--s2);border:1px solid var(--bd);border-radius:var(--ra);padding:14px;margin-bottom:12px;font-size:12px;color:#aaa;line-height:1.7;max-height:120px;overflow-y:auto}
+.scan-preview strong{color:var(--y)}
+
+/* ─ toast ─ */
+.toast{position:fixed;bottom:20px;right:16px;padding:10px 18px;border-radius:var(--rb);font-size:13px;font-weight:500;z-index:300;pointer-events:none;animation:up .25s ease,fadeout .25s 2.3s ease forwards}
+.tok{background:var(--g);color:#000}.terr{background:var(--r);color:#fff}.tinfo{background:var(--b);color:#fff}
+@keyframes fadeout{to{opacity:0;transform:translateY(6px)}}
+
+.empty{text-align:center;padding:40px;color:#555}
+.empty .ico{font-size:32px;margin-bottom:8px}
+hr{border:none;border-top:1px solid var(--bd);margin:20px 0}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">Home<em>Expense</em></div>
+    <div style="display:flex;gap:4px;margin-left:auto">
+      <button class="nt on" data-tab="entry" onclick="showTab('entry',this)">📝 Entry</button>
+      <button class="nt" data-tab="dashboard" onclick="showTab('dashboard',this)">📊 Dashboard</button>
+      <button class="nt" data-tab="settle" onclick="showTab('settle',this)">⚖️ Settle</button>
+      <button class="nt" data-tab="members" onclick="showTab('members',this)">👥 Members</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ══════════ ENTRY TAB ══════════ -->
+    <div id="tab-entry">
+      <!-- Step 1: Month -->
+      <div class="selector-row">
+        <span class="sel-label">Month</span>
+        <div class="month-nav">
+          <button class="mnbtn" onclick="changeMonth(-1)">‹</button>
+          <div class="month-display" id="monthDisplay"></div>
+          <button class="mnbtn mnav-fwd" onclick="changeMonth(1)">›</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Fixed categories above person selection -->
+      <div id="fixedFieldsArea" style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--ra);padding:14px 16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="stitle" style="margin-bottom:0">Fixed Monthly Expenses</div>
+          <button class="btn btn-sm" onclick="saveFixedSection()">Save</button>
+        </div>
+        <div id="fixedFieldsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px"></div>
+      </div>
+
+      <!-- Step 3: Person -->
+      <div class="selector-row" id="personRow">
+        <span class="sel-label">Who are you?</span>
+        <div class="pill-group" id="personPills"></div>
+      </div>
+
+      <!-- Step 4: Entry area (shown after person selected) -->
+      <div id="entryArea" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+          <button class="btn btn-sm" onclick="saveTableSection()">Save Table</button>
+        </div>
+
+        <!-- Toolbar: smart input + camera + voice -->
+        <div class="input-toolbar">
+          <div class="smart-wrap">
+            <input class="smart-inp" id="smartIn" placeholder="500 kirana  or  3300 electricity  or  800 bhaji 5/3" onkeydown="if(event.key==='Enter')parseSmart()">
+            <button class="ib" onclick="parseSmart()" title="Add row from text">⚡ Add</button>
+          </div>
+          <button class="ib" onclick="triggerCamera()" title="Take photo of bill">📷 Scan Bill</button>
+          <button class="ib" onclick="triggerUpload()" title="Upload image">🖼️ Upload</button>
+          <button class="ib" id="voiceBtn" onclick="toggleVoice()" title="Voice input">🎙️ Voice</button>
+          <input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
+          <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="handleImage(this)">
+        </div>
+
+        <div id="scanPreview" class="scan-preview" style="display:none"></div>
+        <div id="voiceStatus" style="display:none;margin-bottom:10px;font-size:12px;color:var(--r);display:none">
+          🎙️ Listening... speak now
+        </div>
+
+        <!-- DESKTOP TABLE -->
+        <div class="tbl-wrap" id="desktopTable">
+          <table class="tbl" id="mainTable">
+            <thead><tr id="tblHead"></tr></thead>
+            <tbody id="tblBody"></tbody>
+            <tfoot><tr class="tbl-foot" id="tblFoot"></tr></tfoot>
+          </table>
+        </div>
+
+        <!-- MOBILE ROWS -->
+        <div class="mobile-entries" id="mobileRows"></div>
+
+        <button class="add-rows-btn" onclick="addRows(5)">+ Add 5 More Rows</button>
+
+        <div class="save-bar">
+          <span id="saveSummary"></span>
+          <span id="syncStatus" style="font-size:11px;color:var(--g);opacity:0;transition:opacity .4s;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:1px"></span>
+          <button class="btn btn-sm" onclick="saveTableSection()">Save Table</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearEntry()">Clear</button>
+          <button class="btn btn-ghost btn-sm" id="sheetsBtn" onclick="showSheetsSetup()" title="Connect Google Sheets">🔗 Google Sheets</button>
+        </div>
+      </div>
+
+      <div id="noPersonMsg" style="padding:40px;text-align:center;color:#555">
+        <div style="font-size:32px;margin-bottom:8px">👆</div>
+        Select your name above to start entering expenses
+      </div>
+    </div>
+
+    <!-- ══════════ DASHBOARD TAB ══════════ -->
+    <div id="tab-dashboard" style="display:none">
+      <div class="selector-row">
+        <span class="sel-label">Month</span>
+        <div class="month-nav">
+          <button class="mnbtn" onclick="changeDashMonth(-1)">‹</button>
+          <div class="month-display" id="dashMonthDisplay"></div>
+          <button class="mnbtn" onclick="changeDashMonth(1)">›</button>
+        </div>
+      </div>
+      <div class="summary-cards">
+        <div class="sc"><div class="sc-label">Total Expenses</div><div class="sc-val y" id="dTotal">₹0</div><div class="sc-sub">this month</div></div>
+        <div class="sc"><div class="sc-label">Per Head</div><div class="sc-val" id="dPerHead">₹0</div><div class="sc-sub" id="dPerHeadSub">÷ earners</div></div>
+        <div class="sc"><div class="sc-label">Entries</div><div class="sc-val g" id="dEntries">0</div><div class="sc-sub">total rows</div></div>
+      </div>
+      <div class="stitle">Member Summary</div>
+      <div class="dash-grid" id="dMemberCards"></div>
+      <div class="stitle">Spend by Category</div>
+      <div class="cat-bars" id="dCatBars"></div>
+    </div>
+
+    <!-- ══════════ SETTLE TAB ══════════ -->
+    <div id="tab-settle" style="display:none">
+      <div class="selector-row">
+        <span class="sel-label">Month</span>
+        <div class="month-nav">
+          <button class="mnbtn" onclick="changeSettleMonth(-1)">‹</button>
+          <div class="month-display" id="settleMonthDisplay"></div>
+          <button class="mnbtn" onclick="changeSettleMonth(1)">›</button>
+        </div>
+      </div>
+      <div class="stitle">Who Pays Whom</div>
+      <div class="settle-list" id="settleList"></div>
+      <hr>
+      <div class="stitle">Full Breakdown</div>
+      <div class="dash-grid" id="settleMemberCards"></div>
+    </div>
+
+    <!-- ══════════ MEMBERS TAB ══════════ -->
+    <div id="tab-members" style="display:none">
+      <div class="info-box">
+        <strong>⚡ Historical protection:</strong> Removing or changing a member only affects future months. Past expense calculations stay frozen exactly as they were when you saved.
+      </div>
+      <div class="stitle">Active Members</div>
+      <div id="memberList"></div>
+      <hr>
+      <div class="stitle">Add New Member</div>
+      <div class="add-mem-form">
+        <input type="text" id="newName" placeholder="Full name" style="flex:2;min-width:130px">
+        <select id="newRole" onchange="toggleCoveredBy()">
+          <option value="earner">Earner (pays share)</option>
+          <option value="homemaker">Homemaker (covered by someone)</option>
+        </select>
+        <select id="newCoveredBy" style="display:none;min-width:130px"></select>
+        <button class="btn btn-g btn-sm" onclick="addMember()">+ Add</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════════
+const LS={
+  get:k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}},
+  set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))
+};
+const expKey =(y,m,uid)=>`ghk3_e_${y}_${String(m).padStart(2,'0')}_${uid}`;
+const snapKey=(y,m)=>`ghk3_snap_${y}_${String(m).padStart(2,'0')}`;
+
+function loadPersonExp(y,m,uid){return LS.get(expKey(y,m,uid))||[]}
+function savePersonExp(y,m,uid,rows){LS.set(expKey(y,m,uid),rows)}
+function getMembersForMonth(y,m){return LS.get(snapKey(y,m))||getMembers()}
+
+// ═══════════════════════════════════════════
+// MEMBERS
+// ═══════════════════════════════════════════
+const DEFAULTS=[
+  {id:'sanjay',  name:'Sanjay',  role:'earner',    coveredBy:null},
+  {id:'nilu',    name:'Nilu',    role:'homemaker', coveredBy:'sanjay'},
+  {id:'leena',   name:'Leena',   role:'earner',    coveredBy:null},
+  {id:'mukul',   name:'Mukul',   role:'earner',    coveredBy:null},
+  {id:'srushti', name:'Srushti', role:'earner',    coveredBy:null},
+];
+const getMembers=()=>LS.get('ghk3_members')||DEFAULTS;
+const saveMembers=m=>LS.set('ghk3_members',m);
+const earners=ms=>ms.filter(m=>m.role==='earner');
+
+// ═══════════════════════════════════════════
+// CATEGORIES
+// ═══════════════════════════════════════════
+// Fixed categories (top fields, one value per month per person)
+const FIXED_CATS=['Rent','Electricity','Maid','Scooty cleaning'];
+const FIXED_DEFAULT_PAID_BY={
+  'Rent':'Mukul',
+  'Electricity':'Mukul',
+  'Maid':'Sanjay',
+  'Scooty cleaning':'Sanjay'
+};
+// Table categories (row-by-row entries)
+const CATS=['Kirana','Bhaji/Milk/Bread','Medicine','Canteen','RCM','Miscellaneous','Other'];
+
+// Sheet column mapping for table categories (Paid By col, Amount col)
+const CAT_COL_MAP={
+  'Kirana':         {paidBy:'H', amount:'I'},
+  'Bhaji/Milk/Bread':{paidBy:'J', amount:'K'},
+  'Medicine':       {paidBy:'L', amount:'M'},
+  'Canteen':        {paidBy:'N', amount:'O'},
+  'RCM':            {paidBy:'P', amount:'Q'},
+  'Miscellaneous':  {paidBy:'R', amount:'T'},
+  'Other':          {paidBy:'U', amount:'W', note:'V'},
+};
+// Fixed category sheet rows (row index in sheet, col B = paid by, col C = amount)
+const FIXED_CAT_ROW={'Rent':2,'Electricity':3,'Maid':10,'Scooty cleaning':11};
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+let curY=new Date().getFullYear(),curM=new Date().getMonth();
+let dashY=curY,dashM=curM;
+let settleY=curY,settleM=curM;
+let selectedMemberId=null;
+let fixedFields={}; // {Rent:{amount:28000,paidBy:'Mukul'}, Electricity:{...}, ...}
+let activeTab='entry';
+const todayISO=()=>new Date().toISOString().split('T')[0];
+const fmt=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+const monthStr=(y,m)=>`${MONTHS[m]} ${y}`;
+const canUseOther=()=>OTHER_SPLIT_IDS.includes(selectedMemberId);
+const visibleCats=()=>canUseOther()?CATS:CATS.filter(c=>c!=='Other');
+const blankFixedFor=cat=>({amount:'',paidBy:FIXED_DEFAULT_PAID_BY[cat]||''});
+function fixedMonthKey(y=curY,m=curM){return `ghk3_fixed_${y}_${String(m).padStart(2,'0')}`;}
+function normalizeFixed(saved={}){
+  const src={...saved};
+  if(src.Scooty && !src['Scooty cleaning']) src['Scooty cleaning']=src.Scooty;
+  const out={};
+  FIXED_CATS.forEach(cat=>out[cat]=src[cat]||blankFixedFor(cat));
+  return out;
+}
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+function showTab(tab,btn){
+  activeTab=tab;
+  document.querySelectorAll('[id^="tab-"]').forEach(el=>el.style.display='none');
+  document.getElementById('tab-'+tab).style.display='block';
+  document.querySelectorAll('.nt').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  if(tab==='entry') renderEntryHeader();
+  if(tab==='dashboard') renderDashboard();
+  if(tab==='settle') renderSettle();
+  if(tab==='members') renderMembers();
+}
+
+// ═══════════════════════════════════════════
+// MONTH NAVIGATION
+// ═══════════════════════════════════════════
+function changeMonth(d){
+  const now=new Date();
+  const maxY=now.getFullYear(), maxM=now.getMonth();
+  curM+=d; if(curM>11){curM=0;curY++;} if(curM<0){curM=11;curY--;}
+  // Block future months
+  if(curY>maxY||(curY===maxY&&curM>maxM)){curM=maxM;curY=maxY;}
+  renderEntryHeader();
+  renderFixedFields();
+  if(selectedMemberId) buildTable();
+}
+function changeDashMonth(d){
+  const now=new Date();
+  const maxY=now.getFullYear(), maxM=now.getMonth();
+  dashM+=d; if(dashM>11){dashM=0;dashY++;} if(dashM<0){dashM=11;dashY--;}
+  if(dashY>maxY||(dashY===maxY&&dashM>maxM)){dashM=maxM;dashY=maxY;}
+  renderDashboard();
+}
+function changeSettleMonth(d){
+  const now=new Date();
+  const maxY=now.getFullYear(), maxM=now.getMonth();
+  settleM+=d; if(settleM>11){settleM=0;settleY++;} if(settleM<0){settleM=11;settleY--;}
+  if(settleY>maxY||(settleY===maxY&&settleM>maxM)){settleM=maxM;settleY=maxY;}
+  renderSettle();
+}
+
+// ═══════════════════════════════════════════
+// ENTRY HEADER (month + person pills)
+// ═══════════════════════════════════════════
+function renderEntryHeader(){
+  const now=new Date();
+  const isCurrentMonth=(curY===now.getFullYear()&&curM===now.getMonth());
+  document.getElementById('monthDisplay').textContent=monthStr(curY,curM);
+  // Disable forward arrow if on current month
+  const fwdBtns=document.querySelectorAll('.mnav-fwd');
+  fwdBtns.forEach(b=>{
+    b.disabled=isCurrentMonth;
+    b.style.opacity=isCurrentMonth?'0.3':'1';
+    b.style.cursor=isCurrentMonth?'not-allowed':'pointer';
+  });
+  const ms=getMembers();
+  document.getElementById('personPills').innerHTML=ms.map(m=>
+    `<button class="pill${m.id===selectedMemberId?' on':''}" onclick="selectPerson('${m.id}')">${m.name}</button>`
+  ).join('');
+}
+
+function selectPerson(id){
+  selectedMemberId=id;
+  document.getElementById('noPersonMsg').style.display='none';
+  document.getElementById('entryArea').style.display='block';
+  renderEntryHeader();
+  buildTable();
+}
+
+// ═══════════════════════════════════════════
+// TABLE BUILDER
+// ═══════════════════════════════════════════
+let tableRows=[]; // [{date, note, amounts:{cat:val}}]
+
+function buildTable(){
+  const saved=loadPersonExp(curY,curM,selectedMemberId);
+  tableRows=saved.length>0 ? saved : emptyRows(25);
+  renderFixedFields();
+  renderTable();
+  renderMobileRows();
+  updateSaveSummary();
+}
+
+function emptyRows(n){
+  return Array.from({length:n},(_,i)=>({date:todayISO(),miscNote:'',note:'',amounts:{}}));
+}
+
+function addRows(n){
+  for(let i=0;i<n;i++) tableRows.push({date:todayISO(),miscNote:'',note:'',amounts:{}});
+  renderTable();
+  renderMobileRows();
+}
+
+function renderFixedFields(){
+  const ms=getMembers();
+  fixedFields=normalizeFixed(LS.get(fixedMonthKey())||fixedFields||{});
+  document.getElementById('fixedFieldsGrid').innerHTML=FIXED_CATS.map(cat=>{
+    const val=fixedFields[cat]||blankFixedFor(cat);
+    return `<div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:10px 12px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--y);margin-bottom:8px;font-family:'Syne',sans-serif;font-weight:700">${cat}</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="number" min="0" placeholder="Amount ₹" value="${val.amount||''}"
+          style="flex:1;background:var(--s1);border:1px solid var(--bd);color:var(--t);border-radius:var(--rb);padding:7px 8px;font-family:'DM Mono';font-size:13px;outline:none;min-width:0"
+          oninput="setFixedField('${cat}','amount',this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()">
+        <select style="flex:1;background:var(--s1);border:1px solid var(--bd);color:var(--t);border-radius:var(--rb);padding:7px 8px;font-size:12px;outline:none;min-width:0"
+          onchange="setFixedField('${cat}','paidBy',this.value)">
+          <option value="">Paid by...</option>
+          ${ms.map(m=>`<option value="${m.name}" ${val.paidBy===m.name?'selected':''}>${m.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setFixedField(cat, field, value){
+  if(!fixedFields[cat]) fixedFields[cat]=blankFixedFor(cat);
+  fixedFields[cat][field]=field==='amount'?(parseFloat(value)||''):value;
+  updateSaveSummary();
+}
+
+async function saveFixedSection(){
+  fixedFields=normalizeFixed(fixedFields);
+  if(!LS.get(snapKey(curY,curM))) LS.set(snapKey(curY,curM),getMembers());
+  LS.set(fixedMonthKey(), fixedFields);
+  updateSaveSummary();
+  toast('Fixed expenses saved','ok');
+  showSyncStatus('Saved fixed locally ✓');
+  await syncToSheets({includeFixed:true, includeTable:false});
+}
+
+// ── Desktop table ──
+function renderTable(){
+  const head=document.getElementById('tblHead');
+  const cats=visibleCats();
+  // Use colgroup to control widths — # and Del fixed, Note medium, categories share remaining
+  const colgroup=document.getElementById('tblColgroup')||document.createElement('colgroup');
+  colgroup.id='tblColgroup';
+  colgroup.innerHTML=
+    `<col style="width:32px">`+ // #
+    cats.map(c=>`<col style="width:7%">`).join('')+
+    `<col style="width:9%">`+ // Misc note
+    (canUseOther()?`<col style="width:9%">`:``)+ // Other note
+    `<col style="width:36px">`; // Del
+  const tbl=document.getElementById('mainTable');
+  if(!document.getElementById('tblColgroup')) tbl.prepend(colgroup);
+
+  head.innerHTML=`<th>#</th>`+
+    cats.map(c=>{
+      const sub=c==='Other'?`<div style="font-size:8px;color:#888;margin-top:1px">÷3</div>`:'';
+      return `<th>${c}${sub}</th>`;
+    }).join('')+
+    `<th>Misc Note</th>${canUseOther()?`<th>Other Note</th>`:``}<th style="color:var(--r)">Del</th>`;
+
+  const body=document.getElementById('tblBody');
+  body.innerHTML='';
+  tableRows.forEach((row,ri)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="rnum">${ri+1}</td>`+
+      cats.map(cat=>{
+        if(cat==='Other'){
+          return `<td style="padding:3px 4px">
+            <input class="cell-inp" type="number" min="0" step="1" placeholder="" value="${row.amounts[cat]||''}"
+              onblur="setAmtOther(${ri},this.value)"
+              oninput="liveTotal()"
+              onkeydown="handleCellKey(event,this)">
+            <div style="font-size:8px;color:#666;text-align:center;padding:1px 0;white-space:nowrap">M·S·L</div>
+          </td>`;
+        }
+        return `<td><input class="cell-inp" type="number" min="0" step="1" placeholder="" value="${row.amounts[cat]||''}"
+          onblur="setAmt(${ri},'${cat}',this.value)"
+          oninput="liveTotal()"
+          onkeydown="handleCellKey(event,this)"></td>`;
+      }).join('')+
+      `<td><input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onblur="setMiscNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>
+      ${canUseOther()?`<td><input class="row-note" placeholder="other note..." value="${row.note||''}" onblur="setNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>`:``}
+      <td><button class="row-del" onclick="delRow(${ri})">✕</button></td>`;
+    body.appendChild(tr);
+  });
+
+  const foot=document.getElementById('tblFoot');
+  foot.innerHTML=`<td>Total</td>`+
+    cats.map(cat=>{
+      const t=tableRows.reduce((s,r)=>s+(parseFloat(r.amounts[cat])||0),0);
+      return `<td data-fcat="${cat}" style="text-align:right">${t>0?fmt(t):''}</td>`;
+    }).join('')+
+    `<td></td>${canUseOther()?`<td></td>`:``}<td></td>`;
+}
+
+// ── Mobile rows ──
+function renderMobileRows(){
+  const wrap=document.getElementById('mobileRows');
+  const cats=visibleCats();
+  wrap.innerHTML='';
+  tableRows.forEach((row,ri)=>{
+    const div=document.createElement('div');
+    div.className='mrow';
+    div.innerHTML=
+      `<button class="mrow-del" onclick="delRow(${ri})">✕</button>
+      <div style="grid-column:1/-1;display:flex;gap:6px;align-items:center">
+        <span style="font-family:'DM Mono';font-size:11px;color:#666;width:22px">${ri+1}</span>
+        <input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onchange="setMiscNote(${ri},this.value)" style="flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px">
+        ${canUseOther()?`<input class="row-note" placeholder="other note..." value="${row.note||''}" onchange="setNote(${ri},this.value)" style="flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px">`:``}
+      </div>`+
+      cats.filter(cat=>row.amounts[cat]>0 || true).slice(0,6).map(cat=>
+        `<div>
+          <label class="fl">${cat}</label>
+          <input type="number" min="0" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px;width:100%;font-family:'DM Mono';font-size:13px;color:var(--t);outline:none" 
+            placeholder="0" value="${row.amounts[cat]||''}" onchange="setAmt(${ri},'${cat}',this.value)">
+        </div>`
+      ).join('')+
+      `<div style="grid-column:1/-1">
+        <label class="fl">More Categories</label>
+        <select onchange="openCatOnMobile(${ri},this.value)">
+          <option value="">+ Add category...</option>
+          ${cats.slice(6).map(c=>`<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>`;
+    wrap.appendChild(div);
+  });
+}
+
+function openCatOnMobile(ri, cat){
+  if(!cat) return;
+  // just set focus / open modal for that category
+  const val=prompt(`Amount for ${cat}:`);
+  if(val && parseFloat(val)>0){ setAmt(ri,cat,val); renderMobileRows(); renderTable(); }
+}
+
+function setDate(ri,v){tableRows[ri].date=v;}
+function setMiscNote(ri,v){tableRows[ri].miscNote=v;}
+function setNote(ri,v){tableRows[ri].note=v;}
+
+// Enter key → move to next input and save current cell
+function handleCellKey(e, inp){
+  if(e.key !== 'Enter') return;
+  e.preventDefault();
+  // Trigger blur to save current cell
+  inp.blur();
+  // Find all focusable inputs in the table
+  const allInputs=[...document.querySelectorAll('#mainTable input.cell-inp, #mainTable input.row-note')];
+  const idx=allInputs.indexOf(inp);
+  if(idx >= 0 && idx < allInputs.length-1){
+    allInputs[idx+1].focus();
+    allInputs[idx+1].select();
+  }
+}
+function setAmt(ri,cat,v){
+  const n=parseFloat(v)||0;
+  if(n>0) tableRows[ri].amounts[cat]=n;
+  else delete tableRows[ri].amounts[cat];
+  liveTotal();
+  updateFootTotals();
+}
+function liveTotal(){ updateSaveSummary(); updateFootTotals(); }
+
+function updateFootTotals(){
+  visibleCats().forEach(cat=>{
+    const cell=document.querySelector(`#tblFoot [data-fcat="${cat}"]`);
+    if(!cell) return;
+    const t=tableRows.reduce((s,r)=>s+(parseFloat(r.amounts[cat])||0),0);
+    cell.textContent=t>0?fmt(t):'';
+  });
+}
+
+function updateSaveSummary(){
+  const tableTotal=tableRows.reduce((s,r)=>s+Object.values(r.amounts).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
+  const fixedTotal=Object.values(fixedFields).reduce((s,f)=>s+(parseFloat(f.amount)||0),0);
+  const total=tableTotal+fixedTotal;
+  const filled=tableRows.filter(r=>Object.values(r.amounts).some(v=>parseFloat(v)>0)).length;
+  document.getElementById('saveSummary').textContent=
+    total>0?`${filled} row${filled!==1?'s':''} · Total: ${fmt(total)}`:'No amounts entered yet';
+}
+
+function delRow(ri){
+  tableRows.splice(ri,1);
+  renderTable();
+  renderMobileRows();
+  updateSaveSummary();
+}
+
+function clearEntry(){
+  tableRows=emptyRows(25);
+  fixedFields={};
+  FIXED_CATS.forEach(cat=>{fixedFields[cat]=blankFixedFor(cat);});
+  renderFixedFields();
+  renderTable();
+  renderMobileRows();
+  updateSaveSummary();
+}
+
+function saveEntry(){
+  return saveTableSection();
+}
+
+async function saveTableSection(){
+  if(!selectedMemberId){toast('Select your name first','err');return;}
+  // Allow saving even with no amounts — always snapshot members
+  if(!LS.get(snapKey(curY,curM))) LS.set(snapKey(curY,curM),getMembers());
+  savePersonExp(curY,curM,selectedMemberId,tableRows);
+  const total=tableRows.reduce((s,r)=>s+Object.values(r.amounts).reduce((a,b)=>a+(parseFloat(b)||0),0),0);
+  toast(`Table saved! ${fmt(total)} by ${getMembers().find(m=>m.id===selectedMemberId)?.name}`,'ok');
+  showSyncStatus('Saved table locally ✓');
+  await syncToSheets({includeFixed:false, includeTable:true});
+}
+
+// Save buttons commit to Google Sheets; editing only updates the on-screen draft.
+function autoSave(){
+  updateSaveSummary();
+}
+
+function showSyncStatus(msg){
+  // Show beside the currently active/last-touched row
+  // Remove any existing floating saved labels
+  document.querySelectorAll('.row-saved-lbl').forEach(el=>el.remove());
+  const active=document.activeElement;
+  const row=active?.closest('tr');
+  if(row){
+    const lbl=document.createElement('span');
+    lbl.className='row-saved-lbl';
+    lbl.textContent=msg;
+    lbl.style.cssText='position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);font-size:11px;color:var(--g);font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:1px;white-space:nowrap;pointer-events:none;animation:fadeout .3s ease 1.5s forwards;z-index:50';
+    row.style.position='relative';
+    row.appendChild(lbl);
+    setTimeout(()=>lbl.remove(),1900);
+  } else {
+    // fallback: show in save bar
+    const el=document.getElementById('syncStatus');
+    if(!el) return;
+    el.textContent=msg;
+    el.style.opacity='1';
+    clearTimeout(el._t);
+    el._t=setTimeout(()=>el.style.opacity='0',1800);
+  }
+}
+
+// ── Other column: always split between Mukul, Sanjay, Leena ──
+const OTHER_SPLIT_IDS=['mukul','sanjay','leena'];
+const OTHER_SPLIT_NAMES=['Mukul','Sanjay','Leena'];
+
+function setAmtOther(ri, v){
+  const n=parseFloat(v)||0;
+  if(n>0){
+    tableRows[ri].amounts['Other']=n;
+    tableRows[ri].otherSplit=OTHER_SPLIT_IDS;
+    tableRows[ri].otherSplitNames=OTHER_SPLIT_NAMES;
+  } else {
+    delete tableRows[ri].amounts['Other'];
+    delete tableRows[ri].otherSplit;
+    delete tableRows[ri].otherSplitNames;
+  }
+  liveTotal();
+  updateFootTotals();
+}
+
+// ═══════════════════════════════════════════
+// SMART TEXT PARSER
+// ═══════════════════════════════════════════
+const CAT_MAP={
+  rent:'Rent',electricity:'Electricity',electric:'Electricity',light:'Electricity',
+  kirana:'Kirana',grocery:'Kirana',groceries:'Kirana',ration:'Kirana',
+  bhaji:'Bhaji/Milk/Bread',milk:'Bhaji/Milk/Bread',bread:'Bhaji/Milk/Bread',sabji:'Bhaji/Milk/Bread',dudh:'Bhaji/Milk/Bread',
+  medicine:'Medicine',medical:'Medicine',pharma:'Medicine',dawai:'Medicine',dawa:'Medicine',
+  canteen:'Canteen',
+  rcm:'RCM',
+  maid:'Maid',bai:'Maid',
+  scooty:'Scooty cleaning',cleaning:'Scooty cleaning',petrol:'Scooty cleaning',
+  misc:'Miscellaneous',other:'Other',
+};
+
+function parseSmart(){
+  const raw=document.getElementById('smartIn').value.trim();
+  if(!raw) return;
+  const amtM=raw.match(/\d+(\.\d+)?/);
+  if(!amtM){toast('No amount found','err');return;}
+  const amount=parseFloat(amtM[0]);
+  let date=todayISO();
+  const dateM=raw.match(/(\d{1,2})\/(\d{1,2})/);
+  if(dateM) date=`${curY}-${dateM[2].padStart(2,'0')}-${dateM[1].padStart(2,'0')}`;
+  let rest=raw.replace(amtM[0],'').replace(dateM?dateM[0]:'','').toLowerCase().trim();
+  let cat='Miscellaneous';
+  for(const[k,v] of Object.entries(CAT_MAP)){if(rest.includes(k)){cat=v;break;}}
+  // Add to first empty row or new row
+  let ri=tableRows.findIndex(r=>!Object.values(r.amounts).some(v=>v>0));
+  if(ri===-1){tableRows.push({date,note:'',amounts:{}});ri=tableRows.length-1;}
+  tableRows[ri].date=date;
+  tableRows[ri].amounts[cat]=(parseFloat(tableRows[ri].amounts[cat])||0)+amount;
+  renderTable();
+  renderMobileRows();
+  updateSaveSummary();
+  document.getElementById('smartIn').value='';
+  toast(`${cat} ${fmt(amount)} added to row ${ri+1}`,'ok');
+}
+
+// ═══════════════════════════════════════════
+// IMAGE SCAN (Claude Vision API)
+// ═══════════════════════════════════════════
+function triggerCamera(){document.getElementById('imgInput').click();}
+function triggerUpload(){document.getElementById('imgUpload').click();}
+
+async function handleImage(inp){
+  if(!inp.files[0]) return;
+  const file=inp.files[0];
+  inp.value='';
+  const prev=document.getElementById('scanPreview');
+  prev.style.display='block';
+  prev.innerHTML='<strong>🔍 Scanning image with AI...</strong> Please wait...';
+
+  try{
+    const b64=await fileToBase64(file);
+    const mediaType=file.type||'image/jpeg';
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image',source:{type:'base64',media_type:mediaType,data:b64}},
+            {type:'text',text:`You are helping process a household expense bill/receipt/diary note for an Indian family.
+Extract ALL expense amounts from this image. The image may be a:
+- Handwritten diary note in Hindi/English/Marathi
+- Printed bill or receipt
+- Screenshot of UPI/PhonePe/GPay transaction
+- Screenshot of bank statement
+
+For each expense found, determine the category from: Rent, Electricity, Kirana, Bhaji/Milk/Bread, Medicine, Canteen, RCM, Maid, Scooty, Miscellaneous, Other.
+Also try to extract the date if visible.
+
+Respond ONLY with a JSON array, no explanation, no markdown:
+[{"amount":500,"category":"Kirana","date":"2025-03-15","note":"Big Bazaar"},...]
+If date not found use null. If category unclear use "Miscellaneous".`}
+          ]
+        }]
+      })
+    });
+    const data=await res.json();
+    const txt=data.content?.map(c=>c.text||'').join('')||'';
+    const clean=txt.replace(/```json|```/g,'').trim();
+    const items=JSON.parse(clean);
+
+    if(!items.length){prev.innerHTML='<strong>⚠️</strong> No expense amounts found in image.';return;}
+
+    let added=0;
+    items.forEach(item=>{
+      if(!item.amount||item.amount<=0) return;
+      let ri=tableRows.findIndex(r=>!Object.values(r.amounts).some(v=>v>0));
+      if(ri===-1){tableRows.push({date:item.date||todayISO(),note:'',amounts:{}});ri=tableRows.length-1;}
+      tableRows[ri].date=item.date||todayISO();
+      if(item.note) tableRows[ri].note=item.note;
+      const cat=CATS.includes(item.category)?item.category:'Miscellaneous';
+      tableRows[ri].amounts[cat]=(parseFloat(tableRows[ri].amounts[cat])||0)+item.amount;
+      added++;
+    });
+
+    renderTable();
+    renderMobileRows();
+    updateSaveSummary();
+
+    prev.innerHTML=`<strong>✅ Found ${added} expense${added!==1?'s':''}:</strong><br>`+
+      items.map(i=>`${i.category}: ${fmt(i.amount)}${i.note?' ('+i.note+')':''}`).join('<br>');
+    toast(`${added} expense${added!==1?'s':''} added from image`,'ok');
+
+  }catch(e){
+    prev.innerHTML='<strong>❌ Could not read image:</strong> '+e.message;
+    toast('Image scan failed','err');
+  }
+}
+
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=()=>rej(new Error('File read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+// ═══════════════════════════════════════════
+// VOICE INPUT
+// ═══════════════════════════════════════════
+let recognition=null, isListening=false;
+
+function toggleVoice(){
+  if(isListening){stopVoice();return;}
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+    toast('Voice not supported on this browser','err');return;
+  }
+  // Ask language
+  showLangModal();
+}
+
+function showLangModal(){
+  const ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML=`<div class="modal">
+    <h3>🎙️ Choose Voice Language</h3>
+    <p>Speak your expense clearly after selecting. Example: <em>"panch sau kirana"</em> or <em>"five hundred kirana"</em></p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <button class="btn btn-y" onclick="startVoice('en-IN');this.closest('.overlay').remove()">🇬🇧 English</button>
+      <button class="btn" style="background:var(--s2);border:1px solid var(--bd);color:var(--t)" onclick="startVoice('hi-IN');this.closest('.overlay').remove()">🇮🇳 Hindi</button>
+      <button class="btn" style="background:var(--s2);border:1px solid var(--bd);color:var(--t)" onclick="startVoice('mr-IN');this.closest('.overlay').remove()">🏔️ Marathi</button>
+    </div>
+    <div class="modal-btns"><button class="mbtn btn-ghost" style="background:transparent;border:1px solid var(--bd);color:#888" onclick="this.closest('.overlay').remove()">Cancel</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+function startVoice(lang){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();
+  recognition.lang=lang;
+  recognition.continuous=false;
+  recognition.interimResults=false;
+
+  recognition.onstart=()=>{
+    isListening=true;
+    document.getElementById('voiceBtn').classList.add('voice-on');
+    document.getElementById('voiceBtn').textContent='🔴 Stop';
+    document.getElementById('voiceStatus').style.display='block';
+  };
+
+  recognition.onresult=e=>{
+    const transcript=e.results[0][0].transcript;
+    document.getElementById('smartIn').value=transcript;
+    toast(`Heard: "${transcript}"`,'info');
+    parseSmart();
+    stopVoice();
+  };
+
+  recognition.onerror=e=>{
+    toast('Voice error: '+e.error,'err');
+    stopVoice();
+  };
+
+  recognition.onend=()=>stopVoice();
+  recognition.start();
+}
+
+function stopVoice(){
+  isListening=false;
+  if(recognition){try{recognition.stop();}catch{}}
+  document.getElementById('voiceBtn').classList.remove('voice-on');
+  document.getElementById('voiceBtn').textContent='🎙️ Voice';
+  document.getElementById('voiceStatus').style.display='none';
+}
+
+// ═══════════════════════════════════════════
+// CALCULATIONS (shared for dashboard + settle)
+// ═══════════════════════════════════════════
+function getAllExpenses(y,m){
+  const members=getMembersForMonth(y,m);
+  const earn=earners(members);
+  const allRows=[];
+  const fixed=normalizeFixed(LS.get(fixedMonthKey(y,m))||{});
+  FIXED_CATS.forEach(cat=>{
+    const val=fixed[cat]||{};
+    const amt=parseFloat(val.amount)||0;
+    const paidBy=(val.paidBy||FIXED_DEFAULT_PAID_BY[cat]||'').trim();
+    const mem=members.find(m=>m.name===paidBy);
+    if(amt>0 && mem) allRows.push({memberId:mem.id,memberName:mem.name,category:cat,amount:amt,date:`${y}-${String(m+1).padStart(2,'0')}-01`,note:'Fixed monthly expense'});
+  });
+  members.forEach(mem=>{
+    const rows=loadPersonExp(y,m,mem.id);
+    rows.forEach(row=>{
+      CATS.forEach(cat=>{
+        const amt=parseFloat(row.amounts?.[cat])||0;
+        if(amt>0) allRows.push({memberId:mem.id,memberName:mem.name,category:cat,amount:amt,date:row.date,note:row.note});
+      });
+    });
+  });
+  return {allRows,members,earn};
+}
+
+function calcBalances(y,m){
+  const {allRows,members,earn}=getAllExpenses(y,m);
+  const paid={},share={};
+  members.forEach(mem=>{paid[mem.id]=0;share[mem.id]=0;});
+
+  allRows.forEach(r=>{paid[r.memberId]=(paid[r.memberId]||0)+r.amount;});
+
+  // Each expense is split equally among all earners
+  const total=allRows.reduce((s,r)=>s+r.amount,0);
+  earn.forEach(e=>{share[e.id]=(share[e.id]||0)+(earn.length?total/earn.length:0);});
+
+  // Homemakers: shift share to coverer
+  members.filter(m=>m.role==='homemaker').forEach(m=>{
+    if(m.coveredBy) share[m.coveredBy]=(share[m.coveredBy]||0)+(share[m.id]||0);
+    share[m.id]=0;
+  });
+
+  const net={};
+  members.forEach(m=>{net[m.id]=(paid[m.id]||0)-(share[m.id]||0);});
+  return {paid,share,net,members,earn,allRows};
+}
+
+function calcSettlement(net,members){
+  const cr=[],db=[];
+  members.forEach(m=>{
+    const v=net[m.id]||0;
+    if(v>0.5) cr.push({...m,amount:v});
+    if(v<-0.5) db.push({...m,amount:-v});
+  });
+  cr.sort((a,b)=>b.amount-a.amount);db.sort((a,b)=>b.amount-a.amount);
+  const tx=[],c=cr.map(x=>({...x})),d=db.map(x=>({...x}));
+  let ci=0,di=0;
+  while(ci<c.length&&di<d.length){
+    const s=Math.min(c[ci].amount,d[di].amount);
+    tx.push({from:d[di].name,to:c[ci].name,amount:Math.round(s)});
+    c[ci].amount-=s;d[di].amount-=s;
+    if(c[ci].amount<0.5)ci++;if(d[di].amount<0.5)di++;
+  }
+  return tx;
+}
+
+// ═══════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════
+function renderDashboard(){
+  document.getElementById('dashMonthDisplay').textContent=monthStr(dashY,dashM);
+  const {paid,share,net,members,earn,allRows}=calcBalances(dashY,dashM);
+  const total=Object.values(paid).reduce((a,b)=>a+b,0);
+
+  document.getElementById('dTotal').textContent=fmt(total);
+  document.getElementById('dPerHead').textContent=fmt(earn.length?total/earn.length:0);
+  document.getElementById('dPerHeadSub').textContent=`÷ ${earn.length} earner${earn.length!==1?'s':''}`;
+  document.getElementById('dEntries').textContent=allRows.length;
+
+  // Member cards
+  document.getElementById('dMemberCards').innerHTML=members.map(m=>{
+    const n=net[m.id]||0;
+    const cls=n>0.5?'get':n<-0.5?'owe':'even';
+    const ac=n>0.5?'pos':n<-0.5?'neg':'zer';
+    const st=n>0.5?'will receive':n<-0.5?'needs to pay':'settled';
+    const covered=members.filter(x=>x.coveredBy===m.id).map(x=>x.name);
+    return `<div class="dcard ${cls}">
+      <div class="dc-name">${m.name}${covered.length?`<span class="tag tc">+${covered.join(',')}</span>`:''}
+        ${m.role==='homemaker'?`<span class="tag th">HM</span>`:`<span class="tag te">E</span>`}</div>
+      <div class="dc-paid">Paid: ${fmt(paid[m.id]||0)}</div>
+      <div class="dc-amt ${ac}">${fmt(Math.abs(n))}</div>
+      <div class="dc-status">${st}</div>
+    </div>`;
+  }).join('');
+
+  // Category bars
+  const cats={};
+  allRows.forEach(r=>{cats[r.category]=(cats[r.category]||0)+r.amount;});
+  const catMax=Math.max(...Object.values(cats),1);
+  document.getElementById('dCatBars').innerHTML=Object.entries(cats).length
+    ?Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,a])=>`
+      <div class="cat-row">
+        <div class="cat-row-name">${c}</div>
+        <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${a/catMax*100}%"></div></div>
+        <div class="cat-row-amt">${fmt(a)}</div>
+      </div>`).join('')
+    :`<div class="empty"><div class="ico">📊</div>No expenses for ${monthStr(dashY,dashM)}</div>`;
+}
+
+// ═══════════════════════════════════════════
+// SETTLE
+// ═══════════════════════════════════════════
+function renderSettle(){
+  document.getElementById('settleMonthDisplay').textContent=monthStr(settleY,settleM);
+  const {paid,share,net,members}=calcBalances(settleY,settleM);
+  const tx=calcSettlement(net,members);
+  document.getElementById('settleList').innerHTML=tx.length
+    ?tx.map(t=>`<div class="settle-item">
+        <span class="sf">${t.from}</span><span class="sa">→</span>
+        <span class="st">${t.to}</span>
+        <span class="sam">${fmt(t.amount)}</span>
+      </div>`).join('')
+    :`<div class="all-good"><div class="big">🎉</div>Everyone is settled for ${monthStr(settleY,settleM)}!</div>`;
+
+  document.getElementById('settleMemberCards').innerHTML=members.filter(m=>m.role==='earner').map(m=>{
+    const n=net[m.id]||0;
+    const cls=n>0.5?'get':n<-0.5?'owe':'even';
+    const ac=n>0.5?'pos':n<-0.5?'neg':'zer';
+    const covered=members.filter(x=>x.coveredBy===m.id).map(x=>x.name);
+    return `<div class="dcard ${cls}">
+      <div class="dc-name">${m.name}${covered.length?`<span class="tag tc">+${covered.join(',')}</span>`:''}</div>
+      <div class="dc-paid">Paid: ${fmt(paid[m.id]||0)} · Due: ${fmt(share[m.id]||0)}</div>
+      <div class="dc-amt ${ac}">${n>0.5?'+':''}${fmt(n)}</div>
+      <div class="dc-status">${n>0.5?'to receive':n<-0.5?'to pay':'settled'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// MEMBERS
+// ═══════════════════════════════════════════
+function renderMembers(){
+  const ms=getMembers();
+  document.getElementById('memberList').innerHTML=ms.map(m=>{
+    const coverName=m.coveredBy?ms.find(x=>x.id===m.coveredBy)?.name:null;
+    const isCovering=ms.find(x=>x.coveredBy===m.id);
+    const roleTag=m.role==='earner'?`<span class="tag te">Earner</span>`:`<span class="tag th">Homemaker</span>`;
+    const delBtn=isCovering
+      ?`<span style="font-size:11px;color:#666">Covers ${isCovering.name}</span>`
+      :`<button class="btn btn-ghost btn-sm" style="border-color:var(--r);color:var(--r)" onclick="confirmDel('${m.id}','${m.name}')">Remove</button>`;
+    return `<div class="mem-row">
+      <div class="mem-av">${m.name[0]}</div>
+      <div class="mem-info">
+        <div class="mem-name">${m.name}${roleTag}</div>
+        <div class="mem-role-txt">${m.role==='homemaker'?`Covered by ${coverName||'?'}`:'Pays equal share'}</div>
+      </div>
+      <div class="mem-acts">
+        <button class="btn btn-ghost btn-sm" onclick="toggleRole('${m.id}')">${m.role==='earner'?'→ Homemaker':'→ Earner'}</button>
+        ${delBtn}
+      </div></div>`;
+  }).join('');
+  updateCBOpts();
+}
+
+function toggleCoveredBy(){
+  const role=document.getElementById('newRole').value;
+  document.getElementById('newCoveredBy').style.display=role==='homemaker'?'block':'none';
+  updateCBOpts();
+}
+function updateCBOpts(){
+  document.getElementById('newCoveredBy').innerHTML='<option value="">Covered by...</option>'+
+    getMembers().filter(m=>m.role==='earner').map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+}
+
+function addMember(){
+  const name=document.getElementById('newName').value.trim();
+  if(!name){toast('Enter a name','err');return;}
+  const ms=getMembers();
+  if(ms.find(m=>m.name.toLowerCase()===name.toLowerCase())){toast('Already exists','err');return;}
+  const role=document.getElementById('newRole').value;
+  const coveredBy=role==='homemaker'?document.getElementById('newCoveredBy').value||null:null;
+  const id=name.toLowerCase().replace(/\s+/g,'_')+'_'+Date.now();
+  ms.push({id,name,role,coveredBy});
+  saveMembers(ms);
+  document.getElementById('newName').value='';
+  toast(`${name} added!`,'ok');
+  renderMembers();
+  renderEntryHeader();
+}
+
+function toggleRole(id){
+  const ms=getMembers(),m=ms.find(x=>x.id===id);
+  if(!m)return;
+  if(m.role==='earner'){
+    const covers=ms.find(x=>x.coveredBy===id);
+    if(covers){toast(`${covers.name} is covered by ${m.name}. Remove that first.`,'err');return;}
+    m.role='homemaker';m.coveredBy=null;
+  }else{m.role='earner';m.coveredBy=null;}
+  saveMembers(ms);renderMembers();toast('Updated','ok');
+}
+
+function confirmDel(id,name){
+  const ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML=`<div class="modal">
+    <h3>Remove ${name}?</h3>
+    <p>This removes <strong>${name}</strong> from <strong>future months only</strong>. All past data stays unchanged.</p>
+    <div class="modal-btns">
+      <button class="mbtn" style="background:var(--s2);border:1px solid var(--bd);color:#888" onclick="this.closest('.overlay').remove()">Cancel</button>
+      <button class="mbtn" style="background:var(--r);color:#fff" onclick="delMember('${id}');this.closest('.overlay').remove()">Remove</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+function delMember(id){
+  saveMembers(getMembers().filter(m=>m.id!==id));
+  toast('Removed','ok');renderMembers();renderEntryHeader();
+}
+
+// ═══════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════
+function toast(msg,type='ok'){
+  const t=document.createElement('div');
+  t.className=`toast t${type}`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2700);
+}
+
+// ═══════════════════════════════════════════
+// GOOGLE SHEETS SYNC
+// ═══════════════════════════════════════════
+const GSHEETS_KEY='ghk3_gsheets_config';
+let gConfig=null; // {clientId, spreadsheetId, accessToken, tokenExpiry}
+let gsiLoaded=false;
+
+function getSheetsConfig(){ return LS.get(GSHEETS_KEY)||null; }
+function saveSheetsConfig(c){ LS.set(GSHEETS_KEY,c); gConfig=c; }
+
+function showSheetsSetup(){
+  const cfg=getSheetsConfig();
+  const ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML=`<div class="modal" style="max-width:480px">
+    <h3>🔗 Connect Google Sheets</h3>
+    <p>This lets your family sync expenses in real time via your existing Google Sheet.</p>
+    <div style="background:var(--s2);border-radius:var(--rb);padding:12px;margin-bottom:14px;font-size:12px;color:#aaa;line-height:1.8">
+      <strong style="color:var(--y)">One-time setup steps:</strong><br>
+      1. Go to <a href="https://console.cloud.google.com" target="_blank" style="color:var(--b)">console.cloud.google.com</a><br>
+      2. Create project → Enable <strong>Google Sheets API</strong> + <strong>Google Drive API</strong><br>
+      3. OAuth consent screen → External → fill name + email<br>
+      4. Credentials → OAuth Client ID → Web app → add origin: <code style="color:var(--y)">null</code><br>
+      5. Copy the <strong>Client ID</strong> below
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div>
+        <label class="fl">Google OAuth Client ID</label>
+        <input type="text" id="gClientId" placeholder="xxxx.apps.googleusercontent.com" value="${cfg?.clientId||'1024373187213-o6u1n63kppit0ldvlgv3eq7uqch7hqih.apps.googleusercontent.com'}" style="font-size:12px">
+      </div>
+      <div>
+        <label class="fl">Google Sheet ID <span style="color:#888">(from your sheet URL)</span></label>
+        <input type="text" id="gSheetId" placeholder="1dyZKJJCAQ2yWQ11jpyAepAJNbKfthHfL" value="${cfg?.spreadsheetId||'1dyZKJJCAQ2yWQ11jpyAepAJNbKfthHfL'}" style="font-size:12px">
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn" style="background:transparent;border:1px solid var(--bd);color:#888;border-radius:var(--rb)" onclick="this.closest('.overlay').remove()">Cancel</button>
+      ${cfg?.accessToken?`<button class="mbtn" style="background:var(--r);color:#fff;border-radius:var(--rb)" onclick="disconnectSheets();this.closest('.overlay').remove()">Disconnect</button>`:''}
+      <button class="mbtn" style="background:var(--y);color:#000;border-radius:var(--rb);font-family:'Syne';font-weight:700" onclick="connectSheets(this)">
+        ${cfg?.accessToken?'Re-authenticate':'Connect & Sign In'}
+      </button>
+    </div>
+    <div id="sheetsMsg" style="margin-top:10px;font-size:12px;color:#888"></div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+function connectSheets(btn){
+  const clientId=document.getElementById('gClientId').value.trim();
+  const spreadsheetId=document.getElementById('gSheetId').value.trim();
+  if(!clientId){document.getElementById('sheetsMsg').textContent='Please enter your Client ID';return;}
+  if(!spreadsheetId){document.getElementById('sheetsMsg').textContent='Please enter your Sheet ID';return;}
+  saveSheetsConfig({clientId,spreadsheetId,accessToken:null,tokenExpiry:0});
+  document.getElementById('sheetsMsg').textContent='Loading Google Sign-In...';
+  loadGSI(clientId, ()=>{
+    signInWithGoogle(clientId, spreadsheetId, btn.closest('.overlay'));
+  });
+}
+
+function loadGSI(clientId, cb){
+  if(gsiLoaded){cb();return;}
+  const s=document.createElement('script');
+  s.src='https://accounts.google.com/gsi/client';
+  s.onload=()=>{gsiLoaded=true;cb();};
+  document.head.appendChild(s);
+}
+
+function signInWithGoogle(clientId, spreadsheetId, overlay){
+  const client=google.accounts.oauth2.initTokenClient({
+    client_id:clientId,
+    scope:'https://www.googleapis.com/auth/spreadsheets',
+    callback:(resp)=>{
+      if(resp.error){
+        toast('Google sign-in failed: '+resp.error,'err');return;
+      }
+      const cfg={clientId,spreadsheetId,accessToken:resp.access_token,tokenExpiry:Date.now()+((resp.expires_in||3600)*1000)};
+      saveSheetsConfig(cfg);
+      overlay?.remove();
+      toast('✅ Connected to Google Sheets!','ok');
+      updateSheetsBtnLabel();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function disconnectSheets(){
+  localStorage.removeItem(GSHEETS_KEY);
+  gConfig=null;
+  updateSheetsBtnLabel();
+  toast('Disconnected from Google Sheets','ok');
+}
+
+function updateSheetsBtnLabel(){
+  const btn=document.getElementById('sheetsBtn');
+  if(!btn) return;
+  const cfg=getSheetsConfig();
+  btn.textContent=cfg?.accessToken?'✅ Sheets':'🔗 Google Sheets';
+  btn.style.borderColor=cfg?.accessToken?'var(--g)':'var(--bd)';
+  btn.style.color=cfg?.accessToken?'var(--g)':'#888';
+}
+
+async function syncToSheets(opts={}){
+  const {includeFixed=true, includeTable=true}=opts;
+  const cfg=getSheetsConfig();
+  if(!cfg?.accessToken||!cfg?.spreadsheetId) return;
+  if(includeTable && !selectedMemberId) return;
+  if(Date.now()>cfg.tokenExpiry-60000){showSyncStatus('⚠️ Token expired — reconnect');return;}
+
+  const memberName=getMembers().find(m=>m.id===selectedMemberId)?.name||selectedMemberId;
+  const sheetName=`${MONTHS[curM]} ${curY}`;
+
+  try{
+    showSyncStatus('Syncing...');
+
+    // Step 1: Ensure month tab exists (copy from TEMPLATE if not)
+    await ensureMonthSheet(cfg, sheetName);
+
+    // Step 2: Build batch update data
+    const updates=[];
+    const enc=s=>encodeURIComponent(s);
+
+    if(includeFixed){
+      fixedFields=normalizeFixed(fixedFields);
+      // ── Fixed categories → col B (paidBy) + col C (amount) at fixed rows ──
+      FIXED_CATS.forEach(cat=>{
+        const row=FIXED_CAT_ROW[cat];
+        const val=fixedFields[cat]||blankFixedFor(cat);
+        updates.push({range:`${sheetName}!B${row}`,values:[[val.paidBy||'']]});
+        updates.push({range:`${sheetName}!C${row}`,values:[[val.amount?parseFloat(val.amount)||0:'']]});
+      });
+    }
+
+    if(includeTable){
+
+    // ── Table rows: clear person's previous entries first, then rewrite ──
+    // We track which sheet rows belong to this person using a marker column (col X = person name)
+    // First: read existing data to find which rows are this person's
+    const readRange=enc(`${sheetName}!H2:X100`);
+    const readRes=await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${readRange}`,
+      {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
+    );
+    const readData=await readRes.json();
+    const existingRows=readData.values||[];
+
+    // Col X (index 16 in H:X range) = person marker
+    // Clear all rows that belong to this person
+    const clearVals=[];
+    existingRows.forEach((row,i)=>{
+      if(row[16]===memberName){
+        // Clear H through X for this row (17 cols)
+        clearVals.push({range:`${sheetName}!H${i+2}:X${i+2}`,values:[Array(17).fill('')]});
+      }
+    });
+    if(clearVals.length>0){
+      await sheetsRequest(cfg,'POST',`${cfg.spreadsheetId}/values:batchClear`,
+        {ranges:clearVals.map(c=>c.range)});
+    }
+
+    // Find next available rows (rows where H is empty)
+    const reReadRes=await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${readRange}`,
+      {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
+    );
+    const reReadData=await reReadRes.json();
+    const freshRows=reReadData.values||[];
+
+    // Write this person's table rows
+    let sheetRowIdx=0; // index into freshRows
+    const filledAppRows=tableRows.filter(r=>Object.values(r.amounts).some(v=>parseFloat(v)>0));
+
+    for(const appRow of filledAppRows){
+      // Find next empty sheet row
+      while(sheetRowIdx<freshRows.length && freshRows[sheetRowIdx]&&freshRows[sheetRowIdx][0]){
+        sheetRowIdx++;
+      }
+      const sheetRow=sheetRowIdx+2; // +2 because data starts at row 2
+
+      // Write each category amount and paid by
+      visibleCats().filter(c=>c!=='Other').forEach(cat=>{
+        const cols=CAT_COL_MAP[cat];
+        if(!cols) return;
+        const amt=parseFloat(appRow.amounts[cat])||0;
+        if(amt>0){
+          updates.push({range:`${sheetName}!${cols.paidBy}${sheetRow}`,values:[[memberName]]});
+          updates.push({range:`${sheetName}!${cols.amount}${sheetRow}`,values:[[amt]]});
+        }
+      });
+      // Other expense
+      if(canUseOther() && appRow.amounts['Other']>0){
+        const cols=CAT_COL_MAP['Other'];
+        updates.push({range:`${sheetName}!${cols.paidBy}${sheetRow}`,values:[[memberName]]});
+        updates.push({range:`${sheetName}!${cols.amount}${sheetRow}`,values:[[parseFloat(appRow.amounts['Other'])]]});
+      }
+      // Miscellaneous remark in S; Other remark in V.
+      if(appRow.miscNote){
+        updates.push({range:`${sheetName}!S${sheetRow}`,values:[[appRow.miscNote]]});
+      }
+      if(canUseOther() && appRow.note){
+        updates.push({range:`${sheetName}!V${sheetRow}`,values:[[appRow.note]]});
+      }
+      // Person marker in col X
+      updates.push({range:`${sheetName}!X${sheetRow}`,values:[[memberName]]});
+
+      sheetRowIdx++;
+    }
+    }
+
+    // Step 3: Batch write all updates
+    if(updates.length>0){
+      await sheetsRequest(cfg,'POST',`${cfg.spreadsheetId}/values:batchUpdate`,{
+        valueInputOption:'USER_ENTERED',
+        data:updates
+      });
+    }
+
+    showSyncStatus('Synced ✓');
+  }catch(e){
+    console.error(e);
+    showSyncStatus('Sync failed');
+  }
+}
+
+async function ensureMonthSheet(cfg, sheetName){
+  // Check if sheet tab exists
+  const metaRes=await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}?fields=sheets.properties.title`,
+    {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
+  );
+  const meta=await metaRes.json();
+  const exists=meta.sheets?.some(s=>s.properties.title===sheetName);
+  if(exists) return;
+
+  // Get TEMPLATE sheet ID
+  const templateSheet=meta.sheets?.find(s=>s.properties.title==='TEMPLATE');
+  if(!templateSheet){toast('TEMPLATE sheet not found in Google Sheets','err');return;}
+
+  // Duplicate TEMPLATE → new tab named sheetName
+  await sheetsRequest(cfg,'POST',`${cfg.spreadsheetId}:batchUpdate`,{
+    requests:[{
+      duplicateSheet:{
+        sourceSheetId:templateSheet.properties.sheetId,
+        insertSheetIndex:meta.sheets.length,
+        newSheetName:sheetName
+      }
+    }]
+  });
+}
+
+async function sheetsRequest(cfg, method, path, body){
+  const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${path}`,{
+    method,
+    headers:{'Authorization':`Bearer ${cfg.accessToken}`,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+renderEntryHeader();
+updateSheetsBtnLabel();
+renderFixedFields();
+</script>
+</body>
+</html>

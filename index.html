@@ -1411,22 +1411,34 @@ async function syncToSheets(opts={}){
   }catch(e){
     console.error(e);
     showSyncStatus('Sync failed');
+    toast(e.message||'Google Sheets sync failed','err');
   }
 }
 
 async function ensureMonthSheet(cfg, sheetName){
   // Check if sheet tab exists
   const metaRes=await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}?fields=sheets.properties.title`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}?fields=sheets.properties(sheetId,title)`,
     {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
   );
   const meta=await metaRes.json();
+  if(!metaRes.ok){
+    throw new Error(meta.error?.message||'Could not read Google Sheet tabs');
+  }
+
+  const cleanTitle=t=>(t||'').trim().toUpperCase();
   const exists=meta.sheets?.some(s=>s.properties.title===sheetName);
   if(exists) return;
 
   // Get TEMPLATE sheet ID
-  const templateSheet=meta.sheets?.find(s=>s.properties.title==='TEMPLATE');
-  if(!templateSheet){toast('TEMPLATE sheet not found in Google Sheets','err');return;}
+  const templateSheet=meta.sheets?.find(s=>cleanTitle(s.properties.title)==='TEMPLATE');
+  if(!templateSheet){
+    const tabs=(meta.sheets||[]).map(s=>s.properties.title).join(', ')||'none found';
+    throw new Error(`TEMPLATE tab not found. Tabs visible to the app: ${tabs}`);
+  }
+  if(!templateSheet.properties.sheetId && templateSheet.properties.sheetId!==0){
+    throw new Error('TEMPLATE tab found, but Google did not return its sheetId');
+  }
 
   // Duplicate TEMPLATE → new tab named sheetName
   await sheetsRequest(cfg,'POST',`${cfg.spreadsheetId}:batchUpdate`,{
@@ -1446,7 +1458,11 @@ async function sheetsRequest(cfg, method, path, body){
     headers:{'Authorization':`Bearer ${cfg.accessToken}`,'Content-Type':'application/json'},
     body:JSON.stringify(body)
   });
-  return res.json();
+  const data=await res.json();
+  if(!res.ok){
+    throw new Error(data.error?.message||'Google Sheets request failed');
+  }
+  return data;
 }
 
 // ═══════════════════════════════════════════

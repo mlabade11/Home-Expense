@@ -345,20 +345,32 @@ const snapKey=(y,m)=>`ghk3_snap_${y}_${String(m).padStart(2,'0')}`;
 
 function loadPersonExp(y,m,uid){return LS.get(expKey(y,m,uid))||[]}
 function savePersonExp(y,m,uid,rows){LS.set(expKey(y,m,uid),rows)}
-function getMembersForMonth(y,m){return LS.get(snapKey(y,m))||getMembers()}
+function getMembersForMonth(y,m){return normalizeMembers(LS.get(snapKey(y,m))||getMembers())}
 
 // ═══════════════════════════════════════════
 // MEMBERS
 // ═══════════════════════════════════════════
 const DEFAULTS=[
-  {id:'sanjay',  name:'Sanjay',  role:'earner',    coveredBy:null},
-  {id:'nilu',    name:'Nilu',    role:'homemaker', coveredBy:'sanjay'},
-  {id:'leena',   name:'Leena',   role:'earner',    coveredBy:null},
+  {id:'sanjay',  name:'Sanjay & Nilu',  role:'earner',    coveredBy:null},
   {id:'mukul',   name:'Mukul',   role:'earner',    coveredBy:null},
+  {id:'leena',   name:'Leena',   role:'earner',    coveredBy:null},
   {id:'srushti', name:'Srushti', role:'earner',    coveredBy:null},
 ];
-const getMembers=()=>LS.get('ghk3_members')||DEFAULTS;
-const saveMembers=m=>LS.set('ghk3_members',m);
+const MEMBER_ORDER=['sanjay','mukul','leena','srushti'];
+function normalizeMembers(ms){
+  const source=(ms&&ms.length?ms:DEFAULTS).filter(m=>m.id!=='nilu' && m.name!=='Nilu');
+  const out=source.map(m=>{
+    if(m.id==='sanjay') return {...m,name:'Sanjay & Nilu',role:'earner',coveredBy:null};
+    return m.coveredBy==='nilu'?{...m,coveredBy:null}:m;
+  });
+  const withSanjay=out.some(m=>m.id==='sanjay')?out:[DEFAULTS.find(m=>m.id==='sanjay'),...out];
+  return withSanjay.sort((a,b)=>{
+    const ai=MEMBER_ORDER.indexOf(a.id), bi=MEMBER_ORDER.indexOf(b.id);
+    return (ai===-1?999:ai)-(bi===-1?999:bi);
+  });
+}
+const getMembers=()=>normalizeMembers(LS.get('ghk3_members')||DEFAULTS);
+const saveMembers=m=>LS.set('ghk3_members',normalizeMembers(m));
 const earners=ms=>ms.filter(m=>m.role==='earner');
 
 // ═══════════════════════════════════════════
@@ -403,7 +415,16 @@ const fmt=n=>'₹'+Math.round(n).toLocaleString('en-IN');
 const monthStr=(y,m)=>`${MONTHS[m]} ${y}`;
 const canUseOther=()=>OTHER_SPLIT_IDS.includes(selectedMemberId);
 const visibleCats=()=>canUseOther()?CATS:CATS.filter(c=>c!=='Other');
+const displayName=m=>m?.name||'';
+const sheetNameForMember=m=>m?.id==='sanjay'?'Sanjay':displayName(m);
+const sheetNameForPaidBy=name=>(name==='Sanjay & Nilu'||name==='Nilu')?'Sanjay':name;
+const shareWeight=m=>m?.id==='sanjay'?2:1;
 const blankFixedFor=cat=>({amount:'',paidBy:FIXED_DEFAULT_PAID_BY[cat]||''});
+function memberForPaidBy(members, paidBy){
+  const name=(paidBy||'').trim();
+  if(name==='Sanjay' || name==='Sanjay & Nilu' || name==='Nilu') return members.find(m=>m.id==='sanjay');
+  return members.find(m=>m.name===name);
+}
 function fixedMonthKey(y=curY,m=curM){return `ghk3_fixed_${y}_${String(m).padStart(2,'0')}`;}
 function normalizeFixed(saved={}){
   const src={...saved};
@@ -522,7 +543,10 @@ function renderFixedFields(){
         <select style="flex:1;background:var(--s1);border:1px solid var(--bd);color:var(--t);border-radius:var(--rb);padding:7px 8px;font-size:12px;outline:none;min-width:0"
           onchange="setFixedField('${cat}','paidBy',this.value)">
           <option value="">Paid by...</option>
-          ${ms.map(m=>`<option value="${m.name}" ${val.paidBy===m.name?'selected':''}>${m.name}</option>`).join('')}
+          ${ms.map(m=>{
+            const sheetName=sheetNameForMember(m);
+            return `<option value="${sheetName}" ${(val.paidBy===sheetName||val.paidBy===m.name)?'selected':''}>${m.name}</option>`;
+          }).join('')}
         </select>
       </div>
     </div>`;
@@ -974,15 +998,19 @@ function getAllExpenses(y,m){
     const val=fixed[cat]||{};
     const amt=parseFloat(val.amount)||0;
     const paidBy=(val.paidBy||FIXED_DEFAULT_PAID_BY[cat]||'').trim();
-    const mem=members.find(m=>m.name===paidBy);
+    const mem=memberForPaidBy(members,paidBy);
     if(amt>0 && mem) allRows.push({memberId:mem.id,memberName:mem.name,category:cat,amount:amt,date:`${y}-${String(m+1).padStart(2,'0')}-01`,note:'Fixed monthly expense'});
   });
-  members.forEach(mem=>{
-    const rows=loadPersonExp(y,m,mem.id);
+  const expenseSources=[...members];
+  if(!expenseSources.some(mem=>mem.id==='nilu')) expenseSources.push({id:'nilu',name:'Nilu'});
+  expenseSources.forEach(sourceMem=>{
+    const targetMem=sourceMem.id==='nilu'?members.find(m=>m.id==='sanjay'):sourceMem;
+    if(!targetMem) return;
+    const rows=loadPersonExp(y,m,sourceMem.id);
     rows.forEach(row=>{
       CATS.forEach(cat=>{
         const amt=parseFloat(row.amounts?.[cat])||0;
-        if(amt>0) allRows.push({memberId:mem.id,memberName:mem.name,category:cat,amount:amt,date:row.date,note:row.note});
+        if(amt>0) allRows.push({memberId:targetMem.id,memberName:targetMem.name,category:cat,amount:amt,date:row.date,note:row.note});
       });
     });
   });
@@ -996,14 +1024,16 @@ function calcBalances(y,m){
 
   allRows.forEach(r=>{paid[r.memberId]=(paid[r.memberId]||0)+r.amount;});
 
-  // Each expense is split equally among all earners
-  const total=allRows.reduce((s,r)=>s+r.amount,0);
-  earn.forEach(e=>{share[e.id]=(share[e.id]||0)+(earn.length?total/earn.length:0);});
-
-  // Homemakers: shift share to coverer
-  members.filter(m=>m.role==='homemaker').forEach(m=>{
-    if(m.coveredBy) share[m.coveredBy]=(share[m.coveredBy]||0)+(share[m.id]||0);
-    share[m.id]=0;
+  allRows.forEach(r=>{
+    const participants=r.category==='Other'
+      ?earn.filter(e=>OTHER_SPLIT_IDS.includes(e.id))
+      :earn;
+    const units=participants.reduce((s,e)=>s+(r.category==='Other'?1:shareWeight(e)),0);
+    if(!units) return;
+    participants.forEach(e=>{
+      const weight=r.category==='Other'?1:shareWeight(e);
+      share[e.id]=(share[e.id]||0)+(r.amount*weight/units);
+    });
   });
 
   const net={};
@@ -1037,10 +1067,11 @@ function renderDashboard(){
   document.getElementById('dashMonthDisplay').textContent=monthStr(dashY,dashM);
   const {paid,share,net,members,earn,allRows}=calcBalances(dashY,dashM);
   const total=Object.values(paid).reduce((a,b)=>a+b,0);
+  const shareUnits=earn.reduce((s,m)=>s+shareWeight(m),0);
 
   document.getElementById('dTotal').textContent=fmt(total);
-  document.getElementById('dPerHead').textContent=fmt(earn.length?total/earn.length:0);
-  document.getElementById('dPerHeadSub').textContent=`÷ ${earn.length} earner${earn.length!==1?'s':''}`;
+  document.getElementById('dPerHead').textContent=fmt(shareUnits?total/shareUnits:0);
+  document.getElementById('dPerHeadSub').textContent=`÷ ${shareUnits} share${shareUnits!==1?'s':''}`;
   document.getElementById('dEntries').textContent=allRows.length;
 
   // Member cards
@@ -1118,7 +1149,7 @@ function renderMembers(){
       <div class="mem-av">${m.name[0]}</div>
       <div class="mem-info">
         <div class="mem-name">${m.name}${roleTag}</div>
-        <div class="mem-role-txt">${m.role==='homemaker'?`Covered by ${coverName||'?'}`:'Pays equal share'}</div>
+        <div class="mem-role-txt">${m.role==='homemaker'?`Covered by ${coverName||'?'}`:(m.id==='sanjay'?'Pays 2 shares':'Pays equal share')}</div>
       </div>
       <div class="mem-acts">
         <button class="btn btn-ghost btn-sm" onclick="toggleRole('${m.id}')">${m.role==='earner'?'→ Homemaker':'→ Earner'}</button>
@@ -1141,6 +1172,7 @@ function updateCBOpts(){
 function addMember(){
   const name=document.getElementById('newName').value.trim();
   if(!name){toast('Enter a name','err');return;}
+  if(name.toLowerCase()==='nilu'){toast('Nilu is included with Sanjay','err');return;}
   const ms=getMembers();
   if(ms.find(m=>m.name.toLowerCase()===name.toLowerCase())){toast('Already exists','err');return;}
   const role=document.getElementById('newRole').value;
@@ -1299,7 +1331,9 @@ async function syncToSheets(opts={}){
   if(includeTable && !selectedMemberId) return;
   if(Date.now()>cfg.tokenExpiry-60000){showSyncStatus('⚠️ Token expired — reconnect');return;}
 
-  const memberName=getMembers().find(m=>m.id===selectedMemberId)?.name||selectedMemberId;
+  const selectedMember=getMembers().find(m=>m.id===selectedMemberId);
+  const memberName=sheetNameForMember(selectedMember)||selectedMemberId;
+  const markerNames=selectedMemberId==='sanjay'?['Sanjay','Sanjay & Nilu','Nilu']:[memberName];
   const sheetName=`${MONTHS[curM]} ${curY}`;
 
   try{
@@ -1318,7 +1352,7 @@ async function syncToSheets(opts={}){
       FIXED_CATS.forEach(cat=>{
         const row=FIXED_CAT_ROW[cat];
         const val=fixedFields[cat]||blankFixedFor(cat);
-        updates.push({range:`${sheetName}!B${row}`,values:[[val.paidBy||'']]});
+        updates.push({range:`${sheetName}!B${row}`,values:[[sheetNameForPaidBy(val.paidBy)||'']]});
         updates.push({range:`${sheetName}!C${row}`,values:[[val.amount?parseFloat(val.amount)||0:'']]});
       });
     }
@@ -1340,7 +1374,7 @@ async function syncToSheets(opts={}){
     // Clear all rows that belong to this person
     const clearVals=[];
     existingRows.forEach((row,i)=>{
-      if(row[16]===memberName){
+      if(markerNames.includes(row[16])){
         // Clear H through X for this row (17 cols)
         clearVals.push({range:`${sheetName}!H${i+2}:X${i+2}`,values:[Array(17).fill('')]});
       }

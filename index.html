@@ -420,7 +420,9 @@ const sheetNameForMember=m=>m?.id==='sanjay'?'Sanjay':displayName(m);
 const sheetNameForPaidBy=name=>(name==='Sanjay & Nilu'||name==='Nilu')?'Sanjay':name;
 const shareWeight=m=>m?.id==='sanjay'?2:1;
 const blankFixedFor=cat=>({amount:'',paidBy:FIXED_DEFAULT_PAID_BY[cat]||''});
-const sheetRowHasExpenseData=row=>(row||[]).slice(0,16).some(v=>String(v||'').trim()!=='');
+const colNum=col=>col.split('').reduce((n,ch)=>n*26+ch.charCodeAt(0)-64,0);
+const rangeOffset=col=>colNum(col)-colNum('H');
+const cellFilled=v=>String(v||'').trim()!=='';
 function memberForPaidBy(members, paidBy){
   const name=(paidBy||'').trim();
   if(name==='Sanjay' || name==='Sanjay & Nilu' || name==='Nilu') return members.find(m=>m.id==='sanjay');
@@ -1371,9 +1373,8 @@ async function syncToSheets(opts={}){
 
     if(includeTable){
 
-    // ── Table rows: clear person's previous entries first, then rewrite ──
-    // We track which sheet rows belong to this person using marker column AI.
-    // First: read existing data to find which rows are this person's
+    // ── Table rows: clear this person's previous cells first, then rewrite.
+    // Each category has its own paid-by/amount columns, so rows are packed per category.
     const readRange=enc(`${sheetName}!H2:AI100`);
     const readRes=await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${readRange}`,
@@ -1382,14 +1383,22 @@ async function syncToSheets(opts={}){
     const readData=await readRes.json();
     const existingRows=readData.values||[];
 
-    // Col AI (index 27 in H:AI range) = person marker. Index 16 supports older X markers.
-    // Clear all rows that belong to this person
     const clearVals=[];
     existingRows.forEach((row,i)=>{
       const marker=row[27]||row[16];
+      visibleCats().forEach(cat=>{
+        const cols=CAT_COL_MAP[cat];
+        if(!cols) return;
+        const paidIdx=rangeOffset(cols.paidBy);
+        if(markerNames.includes(row[paidIdx])){
+          clearVals.push({range:`${sheetName}!${cols.paidBy}${i+2}:${cols.amount}${i+2}`});
+          if(cat==='Miscellaneous') clearVals.push({range:`${sheetName}!S${i+2}`});
+          if(cat==='Other') clearVals.push({range:`${sheetName}!V${i+2}`});
+        }
+      });
       if(markerNames.includes(marker)){
-        // Clear H through AI for this row, including old X markers and new AI markers.
-        clearVals.push({range:`${sheetName}!H${i+2}:AI${i+2}`});
+        clearVals.push({range:`${sheetName}!X${i+2}`});
+        clearVals.push({range:`${sheetName}!AI${i+2}`});
       }
     });
     if(clearVals.length>0){
@@ -1397,7 +1406,7 @@ async function syncToSheets(opts={}){
         {ranges:clearVals.map(c=>c.range)});
     }
 
-    // Find next available rows (rows where H is empty)
+    // Re-read after clearing so each category can find its own first empty row.
     const reReadRes=await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${readRange}`,
       {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
@@ -1405,44 +1414,51 @@ async function syncToSheets(opts={}){
     const reReadData=await reReadRes.json();
     const freshRows=reReadData.values||[];
 
-    // Write this person's table rows
-    let sheetRowIdx=0; // index into freshRows
+    const reserveCategoryRow=(cat)=>{
+      const cols=CAT_COL_MAP[cat];
+      const paidIdx=rangeOffset(cols.paidBy);
+      const amtIdx=rangeOffset(cols.amount);
+      let idx=0;
+      while(freshRows[idx] && (cellFilled(freshRows[idx][paidIdx]) || cellFilled(freshRows[idx][amtIdx]))){
+        idx++;
+      }
+      if(!freshRows[idx]) freshRows[idx]=[];
+      return {sheetRow:idx+2, row:freshRows[idx], paidIdx, amtIdx};
+    };
+
     const filledAppRows=tableRows.filter(r=>Object.values(r.amounts).some(v=>parseFloat(v)>0));
 
     for(const appRow of filledAppRows){
-      // Find next empty sheet row. Check all expense columns, not just H/Kirana.
-      while(sheetRowIdx<freshRows.length && sheetRowHasExpenseData(freshRows[sheetRowIdx])){
-        sheetRowIdx++;
-      }
-      const sheetRow=sheetRowIdx+2; // +2 because data starts at row 2
-
-      // Write each category amount and paid by
+      // Write each category amount into that category's first empty row.
       visibleCats().filter(c=>c!=='Other').forEach(cat=>{
         const cols=CAT_COL_MAP[cat];
         if(!cols) return;
         const amt=parseFloat(appRow.amounts[cat])||0;
         if(amt>0){
+          const slot=reserveCategoryRow(cat);
+          const sheetRow=slot.sheetRow;
           updates.push({range:`${sheetName}!${cols.paidBy}${sheetRow}`,values:[[memberName]]});
           updates.push({range:`${sheetName}!${cols.amount}${sheetRow}`,values:[[amt]]});
+          slot.row[slot.paidIdx]=memberName;
+          slot.row[slot.amtIdx]=amt;
+          if(cat==='Miscellaneous' && appRow.miscNote){
+            updates.push({range:`${sheetName}!S${sheetRow}`,values:[[appRow.miscNote]]});
+          }
         }
       });
       // Other expense
       if(canUseOther() && appRow.amounts['Other']>0){
         const cols=CAT_COL_MAP['Other'];
+        const slot=reserveCategoryRow('Other');
+        const sheetRow=slot.sheetRow;
         updates.push({range:`${sheetName}!${cols.paidBy}${sheetRow}`,values:[[memberName]]});
         updates.push({range:`${sheetName}!${cols.amount}${sheetRow}`,values:[[parseFloat(appRow.amounts['Other'])]]});
+        slot.row[slot.paidIdx]=memberName;
+        slot.row[slot.amtIdx]=parseFloat(appRow.amounts['Other']);
+        if(appRow.note){
+          updates.push({range:`${sheetName}!V${sheetRow}`,values:[[appRow.note]]});
+        }
       }
-      // Miscellaneous remark in S; Other remark in V.
-      if(appRow.miscNote){
-        updates.push({range:`${sheetName}!S${sheetRow}`,values:[[appRow.miscNote]]});
-      }
-      if(canUseOther() && appRow.note){
-        updates.push({range:`${sheetName}!V${sheetRow}`,values:[[appRow.note]]});
-      }
-      // Person marker in hidden col AI
-      updates.push({range:`${sheetName}!AI${sheetRow}`,values:[[memberName]]});
-
-      sheetRowIdx++;
     }
     }
 

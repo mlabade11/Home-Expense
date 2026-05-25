@@ -201,6 +201,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:20px 0}
           <div class="month-display" id="monthDisplay"></div>
           <button class="mnbtn mnav-fwd" onclick="changeMonth(1)">›</button>
         </div>
+        <button class="btn btn-ghost btn-sm" id="sheetsBtn" onclick="showSheetsSetup()" title="Connect Google Sheets">🔗 Google Sheets</button>
       </div>
 
       <!-- Step 2: Fixed categories above person selection -->
@@ -261,7 +262,6 @@ hr{border:none;border-top:1px solid var(--bd);margin:20px 0}
           <span id="syncStatus" style="font-size:11px;color:var(--g);opacity:0;transition:opacity .4s;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:1px"></span>
           <button class="btn btn-sm" onclick="saveTableSection()">Save Table</button>
           <button class="btn btn-ghost btn-sm" onclick="clearEntry()">Clear</button>
-          <button class="btn btn-ghost btn-sm" id="sheetsBtn" onclick="showSheetsSetup()" title="Connect Google Sheets">🔗 Google Sheets</button>
         </div>
       </div>
 
@@ -420,6 +420,7 @@ const sheetNameForMember=m=>m?.id==='sanjay'?'Sanjay':displayName(m);
 const sheetNameForPaidBy=name=>(name==='Sanjay & Nilu'||name==='Nilu')?'Sanjay':name;
 const shareWeight=m=>m?.id==='sanjay'?2:1;
 const blankFixedFor=cat=>({amount:'',paidBy:FIXED_DEFAULT_PAID_BY[cat]||''});
+const sheetRowHasExpenseData=row=>(row||[]).slice(0,16).some(v=>String(v||'').trim()!=='');
 function memberForPaidBy(members, paidBy){
   const name=(paidBy||'').trim();
   if(name==='Sanjay' || name==='Sanjay & Nilu' || name==='Nilu') return members.find(m=>m.id==='sanjay');
@@ -578,9 +579,11 @@ function renderTable(){
   colgroup.id='tblColgroup';
   colgroup.innerHTML=
     `<col style="width:32px">`+ // #
-    cats.map(c=>`<col style="width:7%">`).join('')+
-    `<col style="width:9%">`+ // Misc note
-    (canUseOther()?`<col style="width:9%">`:``)+ // Other note
+    cats.map(c=>
+      `<col style="width:7%">`+
+      (c==='Miscellaneous'?`<col style="width:9%">`:``)+
+      (c==='Other'?`<col style="width:9%">`:``)
+    ).join('')+
     `<col style="width:36px">`; // Del
   const tbl=document.getElementById('mainTable');
   if(!document.getElementById('tblColgroup')) tbl.prepend(colgroup);
@@ -588,9 +591,11 @@ function renderTable(){
   head.innerHTML=`<th>#</th>`+
     cats.map(c=>{
       const sub=c==='Other'?`<div style="font-size:8px;color:#888;margin-top:1px">÷3</div>`:'';
-      return `<th>${c}${sub}</th>`;
+      return `<th>${c}${sub}</th>`+
+        (c==='Miscellaneous'?`<th>Misc Note</th>`:``)+
+        (c==='Other'?`<th>Other Note</th>`:``);
     }).join('')+
-    `<th>Misc Note</th>${canUseOther()?`<th>Other Note</th>`:``}<th style="color:var(--r)">Del</th>`;
+    `<th style="color:var(--r)">Del</th>`;
 
   const body=document.getElementById('tblBody');
   body.innerHTML='';
@@ -598,6 +603,13 @@ function renderTable(){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="rnum">${ri+1}</td>`+
       cats.map(cat=>{
+        let noteCell='';
+        if(cat==='Miscellaneous'){
+          noteCell=`<td><input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onblur="setMiscNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>`;
+        }
+        if(cat==='Other'){
+          noteCell=`<td><input class="row-note" placeholder="other note..." value="${row.note||''}" onblur="setNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>`;
+        }
         if(cat==='Other'){
           return `<td style="padding:3px 4px">
             <input class="cell-inp" type="number" min="0" step="1" placeholder="" value="${row.amounts[cat]||''}"
@@ -605,16 +617,14 @@ function renderTable(){
               oninput="liveTotal()"
               onkeydown="handleCellKey(event,this)">
             <div style="font-size:8px;color:#666;text-align:center;padding:1px 0;white-space:nowrap">M·S·L</div>
-          </td>`;
+          </td>${noteCell}`;
         }
         return `<td><input class="cell-inp" type="number" min="0" step="1" placeholder="" value="${row.amounts[cat]||''}"
           onblur="setAmt(${ri},'${cat}',this.value)"
           oninput="liveTotal()"
-          onkeydown="handleCellKey(event,this)"></td>`;
+          onkeydown="handleCellKey(event,this)"></td>${noteCell}`;
       }).join('')+
-      `<td><input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onblur="setMiscNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>
-      ${canUseOther()?`<td><input class="row-note" placeholder="other note..." value="${row.note||''}" onblur="setNote(${ri},this.value)" onkeydown="handleCellKey(event,this)"></td>`:``}
-      <td><button class="row-del" onclick="delRow(${ri})">✕</button></td>`;
+      `<td><button class="row-del" onclick="delRow(${ri})">✕</button></td>`;
     body.appendChild(tr);
   });
 
@@ -622,9 +632,11 @@ function renderTable(){
   foot.innerHTML=`<td>Total</td>`+
     cats.map(cat=>{
       const t=tableRows.reduce((s,r)=>s+(parseFloat(r.amounts[cat])||0),0);
-      return `<td data-fcat="${cat}" style="text-align:right">${t>0?fmt(t):''}</td>`;
+      return `<td data-fcat="${cat}" style="text-align:right">${t>0?fmt(t):''}</td>`+
+        (cat==='Miscellaneous'?`<td></td>`:``)+
+        (cat==='Other'?`<td></td>`:``);
     }).join('')+
-    `<td></td>${canUseOther()?`<td></td>`:``}<td></td>`;
+    `<td></td>`;
 }
 
 // ── Mobile rows ──
@@ -639,23 +651,23 @@ function renderMobileRows(){
       `<button class="mrow-del" onclick="delRow(${ri})">✕</button>
       <div style="grid-column:1/-1;display:flex;gap:6px;align-items:center">
         <span style="font-family:'DM Mono';font-size:11px;color:#666;width:22px">${ri+1}</span>
-        <input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onchange="setMiscNote(${ri},this.value)" style="flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px">
-        ${canUseOther()?`<input class="row-note" placeholder="other note..." value="${row.note||''}" onchange="setNote(${ri},this.value)" style="flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px">`:``}
       </div>`+
-      cats.filter(cat=>row.amounts[cat]>0 || true).slice(0,6).map(cat=>
-        `<div>
+      cats.map(cat=>{
+        const setter=cat==='Other'?'setAmtOther':'setAmt';
+        return `<div>
           <label class="fl">${cat}</label>
           <input type="number" min="0" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px;width:100%;font-family:'DM Mono';font-size:13px;color:var(--t);outline:none" 
-            placeholder="0" value="${row.amounts[cat]||''}" onchange="setAmt(${ri},'${cat}',this.value)">
-        </div>`
-      ).join('')+
-      `<div style="grid-column:1/-1">
-        <label class="fl">More Categories</label>
-        <select onchange="openCatOnMobile(${ri},this.value)">
-          <option value="">+ Add category...</option>
-          ${cats.slice(6).map(c=>`<option value="${c}">${c}</option>`).join('')}
-        </select>
-      </div>`;
+            placeholder="0" value="${row.amounts[cat]||''}" onchange="${cat==='Other'?`${setter}(${ri},this.value)`:`${setter}(${ri},'${cat}',this.value)`}">
+        </div>`+
+        (cat==='Miscellaneous'?`<div>
+          <label class="fl">Misc Note</label>
+          <input class="row-note" placeholder="misc note..." value="${row.miscNote||''}" onchange="setMiscNote(${ri},this.value)" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px;width:100%">
+        </div>`:``)+
+        (cat==='Other'?`<div>
+          <label class="fl">Other Note</label>
+          <input class="row-note" placeholder="other note..." value="${row.note||''}" onchange="setNote(${ri},this.value)" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rb);padding:6px 8px;width:100%">
+        </div>`:``);
+      }).join('');
     wrap.appendChild(div);
   });
 }
@@ -1360,9 +1372,9 @@ async function syncToSheets(opts={}){
     if(includeTable){
 
     // ── Table rows: clear person's previous entries first, then rewrite ──
-    // We track which sheet rows belong to this person using a marker column (col X = person name)
+    // We track which sheet rows belong to this person using marker column AI.
     // First: read existing data to find which rows are this person's
-    const readRange=enc(`${sheetName}!H2:X100`);
+    const readRange=enc(`${sheetName}!H2:AI100`);
     const readRes=await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${cfg.spreadsheetId}/values/${readRange}`,
       {headers:{'Authorization':`Bearer ${cfg.accessToken}`}}
@@ -1370,13 +1382,14 @@ async function syncToSheets(opts={}){
     const readData=await readRes.json();
     const existingRows=readData.values||[];
 
-    // Col X (index 16 in H:X range) = person marker
+    // Col AI (index 27 in H:AI range) = person marker. Index 16 supports older X markers.
     // Clear all rows that belong to this person
     const clearVals=[];
     existingRows.forEach((row,i)=>{
-      if(markerNames.includes(row[16])){
-        // Clear H through X for this row (17 cols)
-        clearVals.push({range:`${sheetName}!H${i+2}:X${i+2}`,values:[Array(17).fill('')]});
+      const marker=row[27]||row[16];
+      if(markerNames.includes(marker)){
+        // Clear H through AI for this row, including old X markers and new AI markers.
+        clearVals.push({range:`${sheetName}!H${i+2}:AI${i+2}`});
       }
     });
     if(clearVals.length>0){
@@ -1397,8 +1410,8 @@ async function syncToSheets(opts={}){
     const filledAppRows=tableRows.filter(r=>Object.values(r.amounts).some(v=>parseFloat(v)>0));
 
     for(const appRow of filledAppRows){
-      // Find next empty sheet row
-      while(sheetRowIdx<freshRows.length && freshRows[sheetRowIdx]&&freshRows[sheetRowIdx][0]){
+      // Find next empty sheet row. Check all expense columns, not just H/Kirana.
+      while(sheetRowIdx<freshRows.length && sheetRowHasExpenseData(freshRows[sheetRowIdx])){
         sheetRowIdx++;
       }
       const sheetRow=sheetRowIdx+2; // +2 because data starts at row 2
@@ -1426,8 +1439,8 @@ async function syncToSheets(opts={}){
       if(canUseOther() && appRow.note){
         updates.push({range:`${sheetName}!V${sheetRow}`,values:[[appRow.note]]});
       }
-      // Person marker in col X
-      updates.push({range:`${sheetName}!X${sheetRow}`,values:[[memberName]]});
+      // Person marker in hidden col AI
+      updates.push({range:`${sheetName}!AI${sheetRow}`,values:[[memberName]]});
 
       sheetRowIdx++;
     }
